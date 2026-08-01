@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 # ---------------------------------------------------------
-# 1. 页面基本配置与样式
+# 1. 页面配置与暗黑风 CSS
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Pro AI Football Tactical Engine",
@@ -14,7 +14,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# 职业终端暗黑风 CSS
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -24,20 +23,27 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("⚽ Pro AI Tactical Decision Support System")
-st.caption("职业足球赛前博弈推演、蒙特卡洛模拟与 AI 战术决策引擎 (Professional Coach Edition)")
+st.caption("职业足球赛前博弈推演、数据驱动战术映射与蒙特卡洛引擎 (Data-Driven Coach Edition)")
 
 # ---------------------------------------------------------
-# 2. 资源加载与基准预设定义
+# 2. 真实历史数据集与 ML 模型动态加载
 # ---------------------------------------------------------
+@st.cache_data
+def load_datasets():
+    df_clean = pd.read_csv('clean_world_cup_2022.csv')
+    df_raw = pd.read_csv('data.csv')
+    return df_clean, df_raw
+
 @st.cache_resource
 def load_model():
     return joblib.load('world_cup_rf_model.pkl')
 
 try:
+    df_clean, df_raw = load_datasets()
     model = load_model()
-    st.sidebar.success("✅ ML 模型加载成功 (Random Forest)")
+    st.sidebar.success("✅ 2022 世界杯真实数据集 & ML 模型加载成功")
 except Exception as e:
-    st.sidebar.error(f"❌ 模型加载失败: {e}")
+    st.sidebar.error(f"❌ 数据或模型加载失败: {e}")
     st.stop()
 
 # 16 个底层特征定义
@@ -48,85 +54,63 @@ tactical_features = [
     'corners', 'crosses_completed', 'aerial_duels_won_pct', 'errors_leading_to_shot'
 ]
 
-FEATURE_BASELINES = {
-    'xg': 1.3, 'possession': 50.0, 'shots_on_target': 4.5, 'shots_total': 12.0,
-    'passes_completed': 420.0, 'pass_accuracy': 80.0, 'ppda': 11.0, 'tackles_successful': 15.0,
-    'interceptions': 10.0, 'clearances': 18.0, 'fouls_committed': 12.0, 'yellow_cards': 1.8,
-    'corners': 4.5, 'crosses_completed': 5.0, 'aerial_duels_won_pct': 50.0, 'errors_leading_to_shot': 0.3
-}
-
 # ---------------------------------------------------------
-# 3. 2D 足球场与阵型绘制函数 (Matplotlib Engine)
+# 3. 头部交互重构：动态球队选择与历史基准抽取
 # ---------------------------------------------------------
-def draw_2d_pitch(formation_name, team_name):
-    fig, ax = plt.subplots(figsize=(6, 4.2), facecolor='#0e1117')
-    ax.set_facecolor('#1e293b') # 深绿青草色暗黑风
+st.sidebar.header("⚙️ 1. 比赛对阵设置 (Data-Driven)")
+all_teams = sorted(df_clean['team'].unique().tolist())
 
-    # 画外场线与中线
-    ax.plot([0, 0, 100, 100, 0], [0, 100, 100, 0, 0], color="white", alpha=0.3, linewidth=1.5)
-    ax.plot([50, 50], [0, 100], color="white", alpha=0.3, linewidth=1.5)
-    
-    # 画中圈与禁区
-    center_circle = patches.Circle((50, 50), 12, color="white", fill=False, alpha=0.3, linewidth=1.5)
-    left_penalty = patches.Rectangle((0, 20), 18, 60, color="white", fill=False, alpha=0.3, linewidth=1.5)
-    right_penalty = patches.Rectangle((82, 20), 18, 60, color="white", fill=False, alpha=0.3, linewidth=1.5)
-    ax.add_patch(center_circle)
-    ax.add_patch(left_penalty)
-    ax.add_patch(right_penalty)
+col_h, col_a = st.sidebar.columns(2)
+home_team = col_h.selectbox("我方球队", all_teams, index=all_teams.index("Argentina") if "Argentina" in all_teams else 0)
+away_team = col_a.selectbox("对手球队", all_teams, index=all_teams.index("France") if "France" in all_teams else 1)
 
-    # 11 门员及队员坐标映射 (GK + 10 Outfielders)
-    formations_coords = {
-        "4-3-3": [(8,50), (28,18), (25,38), (25,62), (28,82), (50,28), (45,50), (50,72), (80,20), (85,50), (80,80)],
-        "4-2-3-1": [(8,50), (28,18), (25,38), (25,62), (28,82), (42,35), (42,65), (65,20), (68,50), (65,80), (85,50)],
-        "3-5-2": [(8,50), (25,28), (23,50), (25,72), (45,15), (48,35), (45,50), (48,65), (45,85), (82,38), (82,62)],
-        "4-4-2": [(8,50), (28,18), (25,38), (25,62), (28,82), (52,18), (50,38), (50,62), (52,82), (82,38), (82,62)],
-        "5-4-1": [(8,50), (28,12), (25,31), (23,50), (25,69), (28,88), (50,20), (48,40), (48,60), (50,80), (82,50)],
-        "3-4-3": [(8,50), (25,28), (23,50), (25,72), (50,18), (48,38), (48,62), (50,82), (80,20), (85,50), (80,80)]
-    }
-
-    coords = formations_coords.get(formation_name, formations_coords["4-3-3"])
-
-    # 绘制球员节点
-    for idx, (x, y) in enumerate(coords):
-        node_color = '#10b981' if idx > 0 else '#f59e0b' # GK 为橙色，其余球员为亮绿色
-        ax.scatter(x, y, s=280, color=node_color, edgecolors='white', linewidth=2, zorder=5)
-        label = "GK" if idx == 0 else str(idx+1)
-        ax.text(x, y, label, color='white', fontsize=8, fontweight='bold', ha='center', va='center', zorder=6)
-
-    ax.set_xlim(-2, 102)
-    ax.set_ylim(-2, 102)
-    ax.axis('off')
-    ax.set_title(f"{team_name} Formation Pitch View ({formation_name})", color='white', fontsize=11, pad=10)
-    plt.tight_layout()
-    return fig
-
-# ---------------------------------------------------------
-# 4. 侧边栏设置 (对阵、阵型与战术情景)
-# ---------------------------------------------------------
-st.sidebar.header("⚙️ 1. 比赛与对阵设置")
-home_team = st.sidebar.text_input("我方球队 (Home Team)", "Argentina")
-away_team = st.sidebar.text_input("对手球队 (Away Team)", "France")
+# 动态计算我方球队在 2022 世界杯的真实场均数据作为 Baseline
+home_historical_data = df_clean[df_clean['team'] == home_team]
+if not home_historical_data.empty:
+    team_baseline = home_historical_data[tactical_features].mean().to_dict()
+else:
+    team_baseline = df_clean[tactical_features].mean().to_dict()
 
 st.sidebar.markdown("---")
-st.sidebar.header("📐 2. 阵型与对手风格")
+st.sidebar.header("📐 2. 阵型与战术意图 (Stage 1 Mapper)")
+
 formation = st.sidebar.selectbox(
-    "我方阵型 (Formation)",
+    "我方部署阵型",
     ["4-3-3", "4-2-3-1", "3-5-2", "4-4-2", "5-4-1", "3-4-3"]
 )
 
-opp_style = st.sidebar.selectbox(
-    "对手战术风格 (Opponent Style)",
-    ["常规平衡 (Balanced)", "高位逼抢 (High Press)", "传控主导 (Tiki-Taka)", "低位摆大巴 (Low Block)", "快速反击 (Counter Attack)"]
+tactical_style = st.sidebar.selectbox(
+    "本场主导战术 (Instruction)",
+    ["常规平衡 (Balanced)", "高位逼抢 (High Pressing)", "低位反击 (Low Block Counter)", "控球主导 (Possession Focus)"]
 )
 
-st.sidebar.markdown("---")
-st.sidebar.header("🎯 3. 一键战术情景 (Scenario)")
-scenario = st.sidebar.radio(
-    "战术倾向选择",
-    ["常规推演 (Balanced)", "全员激进压迫 (Press All Out)", "极端防守摆大巴 (Parking Bus)", "全线压上攻坚 (Ultra Attack)"],
-    index=0
-)
+# ---------------------------------------------------------
+# 4. Stage 1: 战术映射器逻辑 (Tactical Instruction -> Predicted Stats)
+# ---------------------------------------------------------
+def apply_tactical_mapping(baseline, style, formation):
+    mapped = baseline.copy()
+    
+    # 依据战术指令，对真实基准数据进行合理解释与调整
+    if style == "高位逼抢 (High Pressing)":
+        mapped['ppda'] = max(5.0, mapped['ppda'] * 0.7)  # PPDA 降低，代表高压
+        mapped['tackles_successful'] = mapped['tackles_successful'] * 1.2
+        mapped['xg'] = mapped['xg'] * 1.15
+        mapped['errors_leading_to_shot'] = mapped['errors_leading_to_shot'] + 0.2  # 高压伴随防线留白风险
+    elif style == "低位反击 (Low Block Counter)":
+        mapped['possession'] = min(40.0, mapped['possession'] * 0.75)
+        mapped['ppda'] = mapped['ppda'] * 1.4  # PPDA 升高，低位落位
+        mapped['clearances'] = mapped['clearances'] * 1.3
+        mapped['passes_completed'] = mapped['passes_completed'] * 0.8
+    elif style == "控球主导 (Possession Focus)":
+        mapped['possession'] = max(60.0, mapped['possession'] * 1.15)
+        mapped['passes_completed'] = mapped['passes_completed'] * 1.2
+        mapped['pass_accuracy'] = min(92.0, mapped['pass_accuracy'] * 1.05)
+        
+    return mapped
 
+mapped_stats = apply_tactical_mapping(team_baseline, tactical_style, formation)
+
+st.sidebar.caption(f"💡 当前预测指标已基于 **{home_team}** 的真实世界杯数据及 **{tactical_style}** 指令自动推算。")
 # ---------------------------------------------------------
 # 5. 战术参数自动映射逻辑
 # ---------------------------------------------------------
