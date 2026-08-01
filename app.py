@@ -256,44 +256,44 @@ with col_right:
         curr_val = current_vals[i]
         imp = rf_importances[i]
 
-        # 计算偏离方向：例如 xG 越高越利好 Win；PPDA 越低越利好 Win
         if feat in ['ppda', 'fouls_committed', 'yellow_cards', 'errors_leading_to_shot']:
-            diff = base_val - curr_val  # 数值越小代表表现越好
+            diff = base_val - curr_val
         else:
-            diff = curr_val - base_val  # 数值越大代表表现越好
+            diff = curr_val - base_val
 
         score = diff * imp
         contributions.append((feat, curr_val, score))
 
-    # 按贡献得分排序
     contributions.sort(key=lambda x: x[2], reverse=True)
     top_positives = [c for c in contributions if c[2] > 0][:3]
     top_negatives = [c for c in contributions if c[2] < 0][-3:]
 
-    # 动态构建结构化报告
-    st.markdown(f"""
-    <div class="coach-box">
-        <h4>🏟️ {home_team} vs {away_team}</h4>
-        <p><b>我方阵型：</b>{formation} | <b>对手风格：</b>{opp_style}</p>
-        <p><b>战术倾向：</b>{scenario}</p>
-        <hr style="border:0.5px solid #374151;">
-        
-        <h5>✅ 本场战术优势红利 (Key Strengths)</h5>
-        <ul>
-            {"".join([f"<li><b>{c[0].upper()}</b> ({c[1]:.1f}): 偏离基准带来正向胜率加成</li>" for c in top_positives])}
-        </ul>
+    # ---------------------------------------------------------
+    # 使用 Streamlit 原生容器组件渲染排版（彻底解决 HTML 标签乱码）
+    # ---------------------------------------------------------
+    with st.container(border=True):
+        st.markdown(f"### 🏟️ {home_team} vs {away_team}")
+        st.caption(f"**我方阵型**：{formation} | **对手风格**：{opp_style} | **战术倾向**：{scenario}")
+        st.divider()
 
-        <h5>⚠️ 关键战术风险点 (Key Vulnerabilities)</h5>
-        <ul>
-            {"".join([f"<li><b>{c[0].upper()}</b> ({c[1]:.1f}): 当前设定可能导致掌控力下降</li>" for c in top_negatives])}
-        </ul>
+        st.markdown("##### ✅ 本场战术优势红利 (Key Strengths)")
+        if top_positives:
+            for feat, val, score in top_positives:
+                st.success(f"**{feat.upper()}** (`{val:.1f}`): 偏离基准带来正向胜率加成")
+        else:
+            st.caption("暂无显格优势指标")
 
-        <hr style="border:0.5px solid #374151;">
-        <h5>💡 临场指挥与换人建议 (Actionable Directives)</h5>
-        <p>1. <b>逼抢节奏控制：</b>当前 PPDA 为 {ppda:.1f}。若下半场需破局，建议在 60' 降至 {max(3.0, ppda-2.0):.1f} 实施全场压迫。</p>
-        <p>2. <b>高空与边路：</b>针对 {opp_style} 风格，建议增加边路传中（当前 {crosses_completed} 次），并在 70' 换上高大中锋冲击禁区。</p>
-    </div>
-    """, unsafe_allow_html=True)
+        st.markdown("##### ⚠️ 关键战术风险点 (Key Vulnerabilities)")
+        if top_negatives:
+            for feat, val, score in top_negatives:
+                st.warning(f"**{feat.upper()}** (`{val:.1f}`): 当前设定可能导致掌控力下降")
+        else:
+            st.caption("当前战术风险较低")
+
+        st.divider()
+        st.markdown("##### 💡 临场指挥与换人建议 (Actionable Directives)")
+        st.info(f"1. **逼抢节奏控制**：当前 PPDA 为 `{ppda:.1f}`。若下半场需破局，建议在 60' 降至 `{max(3.0, ppda-2.0):.1f}` 实施全场压迫。")
+        st.info(f"2. **高空与边路**：针对 **{opp_style}** 风格，建议增加边路传中（当前 `{crosses_completed}` 次），并在 70' 换上高大中锋冲击禁区。")
 
     # 单场 XAI 归因柱状图
     st.markdown("#### 🔍 单场战术归因 (Match Attribution XAI)")
