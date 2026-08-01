@@ -246,7 +246,7 @@ with col_mid:
 with col_right:
     st.subheader("📑 赛前战术分析报告 (Executive Coach Report)")
 
-    # 计算当前比赛的战术贡献归因（Match Attribution）
+    # 1. 计算当前比赛的战术贡献归因（Match Attribution）
     rf_importances = model.feature_importances_
     current_vals = input_vector[0]
 
@@ -268,9 +268,38 @@ with col_right:
     top_positives = [c for c in contributions if c[2] > 0][:3]
     top_negatives = [c for c in contributions if c[2] < 0][-3:]
 
-    # ---------------------------------------------------------
-    # 使用 Streamlit 原生容器组件渲染排版（彻底解决 HTML 标签乱码）
-    # ---------------------------------------------------------
+    # 2. 动态战术建议生成引擎 (根据拉低胜率的主要因素动态匹配解法)
+    dynamic_directives = []
+
+    for feat, val, score in top_negatives:
+        if feat == 'ppda':
+            if val > 12.0:
+                dynamic_directives.append(f"🔥 **加强前场压迫**：当前 PPDA 为 `{val:.1f}`，防守逼抢较为被动。建议下半场压低 PPDA 至 `{max(4.0, val - 3.5):.1f}`，提高前场抢断效率。")
+            else:
+                dynamic_directives.append(f"⚠️ **防守体能风险**：当前 PPDA 高达 `{val:.1f}`（极高压），需警惕体能快速消耗与后场留白，建议适时回撤重组。")
+        elif feat == 'crosses_completed':
+            if val < 5:
+                dynamic_directives.append(f"⚽ **利用边路宽度**：当前成功传中仅 `{val}` 次。针对 **{opp_style}** 防线，建议增加边路套上并提高传中频率。")
+            else:
+                dynamic_directives.append(f"🎯 **中路渗透切入**：传中次数已达 `{val}` 次但收益递减，建议减少盲目吊传，增加中路倒脚与肋部直塞。")
+        elif feat == 'xg':
+            dynamic_directives.append(f"🎯 **提升终结质量**：当前预期进球 xG 仅为 `{val:.2f}`。建议通过定位球战术或提升远射质量来制造绝对得分机会。")
+        elif feat == 'possession':
+            if val < 45:
+                dynamic_directives.append(f"🔄 **争夺中场控球**：控球率仅 `{val:.0f}%`，中场陷入被动。建议增加安全短传，稳住比赛节奏。")
+            else:
+                dynamic_directives.append(f"⚡ **加快进攻节奏**：控球率高达 `{val:.0f}%` 但转换效率不足，建议减少无效倒脚，提速向前直塞。")
+        elif feat in ['fouls_committed', 'yellow_cards']:
+            dynamic_directives.append(f"🟨 **控制动作纪律**：当前犯规/黄牌偏高（犯规 `{fouls_committed}` 次，黄牌 `{yellow_cards}` 张），需提醒中场控制动作，避免红牌减员。")
+        elif feat == 'aerial_duels_won_pct':
+            dynamic_directives.append(f"🛡️ **高空球保护**：争顶胜率仅 `{val:.0f}%`，高空对抗处于劣势。建议中后卫收缩禁区，减少毁灭性头球争顶。")
+        elif feat == 'errors_leading_to_shot':
+            dynamic_directives.append(f"🚨 **严禁出球失误**：后场已出现 `{val}` 次致命失误。后场出球时应减少高风险横传，简化解围路线。")
+
+    if not dynamic_directives:
+        dynamic_directives.append("✨ **战术体系高度平衡**：当前各指标运行良好，建议保持现有阵型与比赛节奏，关注球员体能即可。")
+
+    # 3. 渲染 Streamlit 仪表盘
     with st.container(border=True):
         st.markdown(f"### 🏟️ {home_team} vs {away_team}")
         st.caption(f"**我方阵型**：{formation} | **对手风格**：{opp_style} | **战术倾向**：{scenario}")
@@ -279,21 +308,21 @@ with col_right:
         st.markdown("##### ✅ 本场战术优势红利 (Key Strengths)")
         if top_positives:
             for feat, val, score in top_positives:
-                st.success(f"**{feat.upper()}** (`{val:.1f}`): 偏离基准带来正向胜率加成")
+                st.success(f"**{feat.upper()}** (`{val:.1f}`): 正向偏离基准，带来胜率加成")
         else:
             st.caption("暂无显格优势指标")
 
         st.markdown("##### ⚠️ 关键战术风险点 (Key Vulnerabilities)")
         if top_negatives:
             for feat, val, score in top_negatives:
-                st.warning(f"**{feat.upper()}** (`{val:.1f}`): 当前设定可能导致掌控力下降")
+                st.warning(f"**{feat.upper()}** (`{val:.1f}`): 拖累当前战术掌控力")
         else:
             st.caption("当前战术风险较低")
 
         st.divider()
-        st.markdown("##### 💡 临场指挥与换人建议 (Actionable Directives)")
-        st.info(f"1. **逼抢节奏控制**：当前 PPDA 为 `{ppda:.1f}`。若下半场需破局，建议在 60' 降至 `{max(3.0, ppda-2.0):.1f}` 实施全场压迫。")
-        st.info(f"2. **高空与边路**：针对 **{opp_style}** 风格，建议增加边路传中（当前 `{crosses_completed}` 次），并在 70' 换上高大中锋冲击禁区。")
+        st.markdown("##### 💡 动态临场指挥建议 (Dynamic Directives)")
+        for idx, directive in enumerate(dynamic_directives, 1):
+            st.info(f"{idx}. {directive}")
 
     # 单场 XAI 归因柱状图
     st.markdown("#### 🔍 单场战术归因 (Match Attribution XAI)")
