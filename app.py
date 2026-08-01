@@ -23,7 +23,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("⚽ Pro AI Tactical Decision Support System")
-st.caption("职业足球赛前博弈推演、数据驱动战术映射与蒙特卡洛引擎 (Data-Driven Coach Edition)")
+st.caption("职业足球赛前博弈推演、数据驱动战术映射与蒙特卡洛引擎 (Professional Coach UX Edition)")
 
 # ---------------------------------------------------------
 # 2. 真实历史数据集与 ML 模型动态加载
@@ -57,9 +57,9 @@ tactical_features = [
 FEATURE_BASELINES = df_clean[tactical_features].mean().to_dict()
 
 # ---------------------------------------------------------
-# 3. 2D 足球场与阵型绘制函数 (Matplotlib Engine)
+# 3. 增强版 2D 足球场绘制 (含战术意图动态图层 UX 优化)
 # ---------------------------------------------------------
-def draw_2d_pitch(formation_name, team_name):
+def draw_2d_pitch_enhanced(formation_name, team_name, tactical_style):
     fig, ax = plt.subplots(figsize=(6, 4.2), facecolor='#0e1117')
     ax.set_facecolor('#1e293b') # 深绿青草色暗黑风
 
@@ -74,6 +74,17 @@ def draw_2d_pitch(formation_name, team_name):
     ax.add_patch(center_circle)
     ax.add_patch(left_penalty)
     ax.add_patch(right_penalty)
+
+    # 动态战术图层：依据战术风格画出压迫线与战术区域
+    if "高位逼抢" in tactical_style:
+        ax.axvline(x=68, color='#ef4444', linestyle='--', linewidth=2, alpha=0.7)
+        ax.text(69, 92, '🔥 HIGH PRESS LINE', color='#ef4444', fontsize=8, fontweight='bold')
+    elif "低位反击" in tactical_style:
+        ax.axvline(x=32, color='#3b82f6', linestyle='--', linewidth=2, alpha=0.7)
+        ax.text(33, 92, '🛡️ LOW BLOCK LINE', color='#3b82f6', fontsize=8, fontweight='bold')
+    elif "控球主导" in tactical_style:
+        ax.axvline(x=50, color='#10b981', linestyle='--', linewidth=2, alpha=0.7)
+        ax.text(51, 92, '🔄 MIDFIELD CONTROL', color='#10b981', fontsize=8, fontweight='bold')
 
     # 11 门员及队员坐标映射
     formations_coords = {
@@ -97,7 +108,7 @@ def draw_2d_pitch(formation_name, team_name):
     ax.set_xlim(-2, 102)
     ax.set_ylim(-2, 102)
     ax.axis('off')
-    ax.set_title(f"{team_name} Formation Pitch View ({formation_name})", color='white', fontsize=11, pad=10)
+    ax.set_title(f"{team_name} ({formation_name}) - {tactical_style}", color='white', fontsize=11, pad=10)
     plt.tight_layout()
     return fig
 
@@ -145,12 +156,12 @@ scenario = st.sidebar.radio(
 )
 
 # ---------------------------------------------------------
-# 5. Stage 1: 战术映射器逻辑 (Instruction -> Mapped Stats)
+# 5. Stage 1: 战术映射器逻辑
 # ---------------------------------------------------------
 def apply_tactical_mapping(baseline, style, opp_style, scenario, formation):
     mapped = baseline.copy()
     
-    # A. 我方战术指令 (Our Instruction)
+    # A. 我方战术指令
     if style == "高位逼抢 (High Pressing)":
         mapped['ppda'] = max(4.0, mapped['ppda'] * 0.7)
         mapped['tackles_successful'] = mapped['tackles_successful'] * 1.2
@@ -166,7 +177,7 @@ def apply_tactical_mapping(baseline, style, opp_style, scenario, formation):
         mapped['passes_completed'] = mapped['passes_completed'] * 1.2
         mapped['pass_accuracy'] = min(92.0, mapped['pass_accuracy'] * 1.05)
 
-    # B. 对手风格制约 (Opponent Influence)
+    # B. 对手风格制约
     if opp_style == "高位逼抢 (High Press)":
         mapped['ppda'] = max(4.0, mapped['ppda'] - 1.5)
         mapped['pass_accuracy'] = max(60.0, mapped['pass_accuracy'] - 4.0)
@@ -177,7 +188,7 @@ def apply_tactical_mapping(baseline, style, opp_style, scenario, formation):
         mapped['possession'] = max(25.0, mapped['possession'] - 8.0)
         mapped['tackles_successful'] = mapped['tackles_successful'] + 3.0
 
-    # C. 战术情景微调 (Scenario)
+    # C. 战术情景微调
     if scenario == "全员激进压迫 (Press All Out)":
         mapped['ppda'] = 5.5
         mapped['tackles_successful'] = mapped['tackles_successful'] + 5.0
@@ -208,19 +219,26 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 # =========================================================
-# TAB 1: 2D 足球场 + 战术指令微调面板
+# TAB 1: 2D 足球场 + KPI 变化对比 + 战术指令微调面板
 # =========================================================
 with tab1:
     col_pitch, col_panel = st.columns([1.2, 1.0])
 
     with col_pitch:
-        st.subheader("🏟️ 2D 战术阵型部署")
-        fig_pitch = draw_2d_pitch(formation, home_team)
+        st.subheader("🏟️ 2D 战术阵型部署与意图图层")
+        fig_pitch = draw_2d_pitch_enhanced(formation, home_team, tactical_style)
         st.pyplot(fig_pitch)
+
+        st.markdown("##### 📈 战术部署对 KPI 的预期影响 (vs 历史基准)")
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("预期进球 xG", f"{mapped_stats['xg']:.2f}", f"{mapped_stats['xg'] - team_baseline['xg']:+.2f}")
+        k2.metric("控球率 Possession", f"{mapped_stats['possession']:.1f}%", f"{mapped_stats['possession'] - team_baseline['possession']:+.1f}%")
+        k3.metric("逼抢强度 PPDA", f"{mapped_stats['ppda']:.1f}", f"{mapped_stats['ppda'] - team_baseline['ppda']:+.1f}")
+        k4.metric("成功抢断 Tackles", f"{mapped_stats['tackles_successful']:.1f}", f"{mapped_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}")
 
     with col_panel:
         st.subheader("📋 战术指令微调 (Tactical Panel)")
-        st.caption("系统已基于真实数据集与 Stage 1 战术映射自动生成推算值，教练组可手动微调：")
+        st.caption("系统已生成推算值，教练组可根据对局细节微调：")
 
         with st.expander("🎯 进攻终结 (Attacking)", expanded=True):
             xg = st.slider("预期进球 (xG Target)", 0.1, 4.0, float(round(mapped_stats['xg'], 2)), 0.1)
@@ -255,12 +273,13 @@ input_vector = np.array([[
 ]])
 
 # =========================================================
-# TAB 2: 蒙特卡洛 1000 次模拟引擎
+# TAB 2: 蒙特卡洛 1000 次模拟引擎 + 战术方案 A/B 对比
 # =========================================================
 with tab2:
-    st.subheader("🎲 蒙特卡洛 1,000 场平行宇宙模拟")
-    st.caption("在赛前战术框架下，注入符合比赛规律的临场随机扰动，评估风险与置信区间：")
+    st.subheader("🎲 蒙特卡洛 1,000 场平行宇宙模拟 & 战术 A/B 对比")
+    st.caption("评估当前战术部署下的风险离散度，并可一键对比替代战术方案：")
 
+    # 1. 当前方案模拟
     N_SIM = 1000
     np.random.seed(42)
     noise = np.random.normal(0, 1, (N_SIM, 16))
@@ -293,21 +312,57 @@ with tab2:
 
     st.markdown(f"##### 📊 **95% 胜率置信区间 (Confidence Interval)**: `{ci_lower:.1f}%` ~ `{ci_upper:.1f}%`")
 
-    # 直方图
-    fig_mc, ax_mc = plt.subplots(figsize=(8, 3.2))
-    ax_mc.hist(win_probs_series * 100, bins=30, color='#10b981', alpha=0.75, edgecolor='black')
-    ax_mc.axvline(mc_win_pct, color='#ef4444', linestyle='--', linewidth=2, label=f'Mean Win Prob ({mc_win_pct:.1f}%)')
-    ax_mc.set_title("1,000 Runs Win Probability Distribution", color='white', fontsize=11)
-    ax_mc.set_xlabel("Predicted Win Probability (%)", color='white')
-    ax_mc.set_ylabel("Frequency", color='white')
-    ax_mc.tick_params(colors='white')
-    ax_mc.legend(loc='upper right', facecolor='#111827', labelcolor='white')
-    fig_mc.patch.set_facecolor('#111827')
-    ax_mc.set_facecolor('#1f2937')
-    st.pyplot(fig_mc)
+    col_sim_chart, col_ab = st.columns([1.1, 0.9])
+
+    with col_sim_chart:
+        # 直方图
+        fig_mc, ax_mc = plt.subplots(figsize=(6, 3.2))
+        ax_mc.hist(win_probs_series * 100, bins=30, color='#10b981', alpha=0.75, edgecolor='black')
+        ax_mc.axvline(mc_win_pct, color='#ef4444', linestyle='--', linewidth=2, label=f'Mean Win ({mc_win_pct:.1f}%)')
+        ax_mc.set_title("1,000 Runs Win Probability Distribution", color='white', fontsize=10)
+        ax_mc.set_xlabel("Predicted Win Probability (%)", color='white')
+        ax_mc.set_ylabel("Frequency", color='white')
+        ax_mc.tick_params(colors='white')
+        ax_mc.legend(loc='upper right', facecolor='#111827', labelcolor='white')
+        fig_mc.patch.set_facecolor('#111827')
+        ax_mc.set_facecolor('#1f2937')
+        st.pyplot(fig_mc)
+
+    with col_ab:
+        with st.container(border=True):
+            st.markdown("#### ⚖️ 战术方案 A/B 对比矩阵")
+            st.caption("设当前配置为 **方案 A ({})**，快速推算备选 **方案 B**：".format(tactical_style))
+            
+            alt_style = st.selectbox(
+                "选择备选方案 B 的战术指令",
+                ["低位反击 (Low Block Counter)", "高位逼抢 (High Pressing)", "控球主导 (Possession Focus)", "常规平衡 (Balanced)"],
+                index=0
+            )
+
+            alt_mapped = apply_tactical_mapping(team_baseline, alt_style, opp_style, scenario, formation)
+            alt_vector = np.array([[alt_mapped[f] for f in tactical_features]])
+            alt_sim_inputs = np.clip(alt_vector + noise * scale, a_min=0, a_max=None)
+            alt_sim_preds = model.predict(alt_sim_inputs)
+            
+            alt_win_pct = (np.sum(alt_sim_preds == 'Win') / N_SIM) * 100
+            alt_draw_pct = (np.sum(alt_sim_preds == 'Draw') / N_SIM) * 100
+            alt_loss_pct = (np.sum(alt_sim_preds == 'Loss') / N_SIM) * 100
+
+            st.divider()
+            ab1, ab2 = st.columns(2)
+            ab1.metric("方案 A 预测胜率", f"{mc_win_pct:.1f}%")
+            ab2.metric("方案 B 预测胜率", f"{alt_win_pct:.1f}%", f"{alt_win_pct - mc_win_pct:+.1f}%")
+
+            diff = alt_win_pct - mc_win_pct
+            if diff > 3.0:
+                st.success(f"💡 **建议方案 B**：改用 **{alt_style}** 可将胜率提升 `{diff:+.1f}%`！")
+            elif diff < -3.0:
+                st.warning(f"🛡️ **保持方案 A**：方案 B 会导致胜率下降 `{abs(diff):.1f}%`。")
+            else:
+                st.info("⚖️ 两种方案预测胜率相近，可依据队员临场体能灵活切换。")
 
 # =========================================================
-# TAB 3: XAI 归因与动态教练报告
+# TAB 3: XAI 归因与动态教练报告 + 报告导出下载
 # =========================================================
 with tab3:
     st.subheader("📑 赛前战术决策报告 (Executive Brief)")
@@ -389,6 +444,25 @@ with tab3:
             st.markdown("##### 💡 动态临场指挥建议 (Dynamic Directives)")
             for idx, directive in enumerate(dynamic_directives, 1):
                 st.info(f"{idx}. {directive}")
+
+            # 导出下载战术简报按钮
+            report_text = f"""# ⚽ 赛前战术简报: {home_team} vs {away_team}
+- 我方阵型: {formation}
+- 我方战术: {tactical_style}
+- 对手风格: {opp_style}
+- 预测胜率: {mc_win_pct:.1f}% (95% 置信区间: {ci_lower:.1f}% ~ {ci_upper:.1f}%)
+
+---
+## 💡 临场指挥指令:
+""" + "\n".join([f"{i}. {d}" for i, d in enumerate(dynamic_directives, 1)])
+
+            st.divider()
+            st.download_button(
+                label="📥 一键下载赛前战术简报 (.md)",
+                data=report_text,
+                file_name=f"Tactical_Brief_{home_team}_vs_{away_team}.md",
+                mime="text/markdown"
+            )
 
     with col_xai:
         st.markdown("#### 🔍 单场战术归因 (Match Attribution XAI)")
