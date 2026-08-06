@@ -40,7 +40,7 @@ def load_datasets():
 
 @st.cache_resource
 def load_model():
-    return joblib.load('world_cup_rf_model_v2.pkl')
+    return joblib.load('world_cup_rf_model.pkl')
 
 try:
     df_clean = load_datasets()
