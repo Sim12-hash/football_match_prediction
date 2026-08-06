@@ -239,29 +239,34 @@ with tab1:
         st.subheader("📋 细粒度战术微调 (Data Panel)")
         st.caption("以下数据由 AI 阵型对弈引擎自动解算，您可基于球员伤停等状况手动干预：")
 
+        # 核心修复点：生成一个由当前所有【侧边栏选项】拼接而成的动态 Key
+        # 只要这 5 个变量中有任何一个发生改变，ui_key 就会变
+        # Streamlit 发现 key 变了，就会把滑块当成全新的组件，从而强制重置为你设定的默认值
+        ui_key = f"{home_team}_{away_team}_{home_formation}_{opp_formation}_{scenario}"
+
         with st.expander("🎯 进攻终结 (Attacking)", expanded=True):
-            xg = st.slider("预期进球 (xG Target)", 0.1, 4.0, float(round(mapped_stats['xg'], 2)), 0.1)
-            shots_on_target = st.slider("射正数 Target", 0, 15, int(round(mapped_stats['shots_on_target'])))
-            shots_total = st.slider("总射门数 Target", 1, 30, max(int(round(mapped_stats['shots_total'])), shots_on_target + 2))
-            corners = st.slider("角球次数", 0, 15, int(round(mapped_stats['corners'])))
+            xg = st.slider("预期进球 (xG Target)", 0.1, 4.0, float(round(mapped_stats['xg'], 2)), 0.1, key=f"xg_{ui_key}")
+            shots_on_target = st.slider("射正数 Target", 0, 15, int(round(mapped_stats['shots_on_target'])), key=f"sot_{ui_key}")
+            shots_total = st.slider("总射门数 Target", 1, 30, max(int(round(mapped_stats['shots_total'])), shots_on_target + 2), key=f"st_{ui_key}")
+            corners = st.slider("角球次数", 0, 15, int(round(mapped_stats['corners'])), key=f"cor_{ui_key}")
 
         with st.expander("🔄 组织控球 (Build-up)", expanded=False):
-            possession = st.slider("控球率 (%)", 20, 80, int(round(mapped_stats['possession'])))
-            passes_completed = st.slider("成功传球数", 100, 900, int(round(mapped_stats['passes_completed'])), 10)
-            pass_accuracy = st.slider("传球成功率 (%)", 50, 98, int(round(mapped_stats['pass_accuracy'])))
-            crosses_completed = st.slider("成功传中数", 0, 25, int(round(mapped_stats['crosses_completed'])))
+            possession = st.slider("控球率 (%)", 20, 80, int(round(mapped_stats['possession'])), key=f"poss_{ui_key}")
+            passes_completed = st.slider("成功传球数", 100, 900, int(round(mapped_stats['passes_completed'])), 10, key=f"pass_{ui_key}")
+            pass_accuracy = st.slider("传球成功率 (%)", 50, 98, int(round(mapped_stats['pass_accuracy'])), key=f"acc_{ui_key}")
+            crosses_completed = st.slider("成功传中数", 0, 25, int(round(mapped_stats['crosses_completed'])), key=f"cross_{ui_key}")
 
         with st.expander("🛡️ 防守压迫 (Defensive)", expanded=False):
-            ppda = st.slider("PPDA (逼抢强度, 越低越高压)", 3.0, 30.0, float(round(mapped_stats['ppda'], 1)), 0.5)
-            tackles_successful = st.slider("成功抢断", 3, 40, int(round(mapped_stats['tackles_successful'])))
-            interceptions = st.slider("拦截次数", 1, 30, int(round(mapped_stats['interceptions'])))
-            clearances = st.slider("解围次数", 3, 50, int(round(mapped_stats['clearances'])))
+            ppda = st.slider("PPDA (逼抢强度, 越低越高压)", 3.0, 30.0, float(round(mapped_stats['ppda'], 1)), 0.5, key=f"ppda_{ui_key}")
+            tackles_successful = st.slider("成功抢断", 3, 40, int(round(mapped_stats['tackles_successful'])), key=f"tack_{ui_key}")
+            interceptions = st.slider("拦截次数", 1, 30, int(round(mapped_stats['interceptions'])), key=f"int_{ui_key}")
+            clearances = st.slider("解围次数", 3, 50, int(round(mapped_stats['clearances'])), key=f"clear_{ui_key}")
 
         with st.expander("⚔️ 对抗纪律 (Duels & Errors)", expanded=False):
-            aerial_duels_won_pct = st.slider("争顶胜率 (%)", 20, 80, int(round(mapped_stats['aerial_duels_won_pct'])))
-            fouls_committed = st.slider("犯规次数", 1, 30, int(round(mapped_stats['fouls_committed'])))
-            yellow_cards = st.number_input("黄牌数", 0, 8, int(round(mapped_stats['yellow_cards'])))
-            errors_leading_to_shot = st.number_input("致命失误致射门", 0, 3, int(round(mapped_stats['errors_leading_to_shot'])))
+            aerial_duels_won_pct = st.slider("争顶胜率 (%)", 20, 80, int(round(mapped_stats['aerial_duels_won_pct'])), key=f"aer_{ui_key}")
+            fouls_committed = st.slider("犯规次数", 1, 30, int(round(mapped_stats['fouls_committed'])), key=f"foul_{ui_key}")
+            yellow_cards = st.number_input("黄牌数", 0, 8, int(round(mapped_stats['yellow_cards'])), key=f"yc_{ui_key}")
+            errors_leading_to_shot = st.number_input("致命失误致射门", 0, 3, int(round(mapped_stats['errors_leading_to_shot'])), key=f"err_{ui_key}")
 
 input_vector = np.array([[
     xg, possession, shots_on_target, shots_total,
