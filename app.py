@@ -17,12 +17,9 @@ st.set_page_config(
 st.markdown("""
     <style>
     .main { background-color: #0b0f19; }
-    
-    /* 高对比度视觉勋章卡片 */
     .metric-card-win { background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); border: 2px solid #00FF87; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
     .metric-card-draw { background: linear-gradient(135deg, #713f12 0%, #451a03 100%); border: 2px solid #FACC15; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(250, 204, 21, 0.2); }
     .metric-card-loss { background: linear-gradient(135deg, #881337 0%, #4c0519 100%); border: 2px solid #FF0055; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(255, 0, 85, 0.2); }
-    
     .metric-title { color: #94a3b8; font-size: 13px; font-weight: 600; text-transform: uppercase; }
     .metric-value-win { color: #00FF87; font-size: 28px; font-weight: 800; }
     .metric-value-draw { color: #FACC15; font-size: 28px; font-weight: 800; }
@@ -31,7 +28,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("⚽ Pro AI Tactical Decision Support System")
-st.caption("职业足球赛前博弈推演、阵型对位引擎与高对比度蒙特卡洛引擎 (Professional Dashboard)")
+st.caption("职业足球赛前博弈推演、阵型对位引擎与高对比度蒙特卡洛引擎 (Head Coach Efficiency Edition)")
 
 # ---------------------------------------------------------
 # 2. 真实历史数据集与 ML 模型动态加载
@@ -217,7 +214,7 @@ mapped_stats = apply_formation_clash_engine(team_baseline, opp_baseline, home_fo
 tab1, tab2, tab3 = st.tabs([
     "🏟️ 1. 战术沙盘微调 (Tactical Board)",
     "🎲 2. 蒙特卡洛胜率诊断 (Monte Carlo Engine)",
-    "🔍 3. 核心战术因子归因 (XAI Attribution)"
+    "📑 3. 教练战术简报 (Executive Brief)"
 ])
 
 # =========================================================
@@ -274,7 +271,7 @@ input_vector = np.array([[
 ]])
 
 # =========================================================
-# TAB 2: 高对比度蒙特卡洛引擎 (精简为3列展示)
+# TAB 2: 高对比度蒙特卡洛引擎 (期望胜率连续分布版)
 # =========================================================
 with tab2:
     st.subheader("🎲 蒙特卡洛 1,000 场平行宇宙模拟 & 变阵诊判")
@@ -288,28 +285,29 @@ with tab2:
     scale = np.array([0.15, 2.5, 0.8, 1.5, 25, 1.5, 0.8, 1.2, 1.0, 1.5, 1.0, 0.3, 0.8, 0.8, 2.0, 0.2])
     
     sim_inputs = np.clip(input_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
-    sim_preds = model.predict(sim_inputs)
     sim_probs = model.predict_proba(sim_inputs)
 
-    classes = model.classes_
-    win_idx = list(classes).index('Win') if 'Win' in classes else 2
+    classes = list(model.classes_)
+    win_idx = classes.index('Win') if 'Win' in classes else 2
+    draw_idx = classes.index('Draw') if 'Draw' in classes else 0
+    loss_idx = classes.index('Loss') if 'Loss' in classes else 1
 
-    mc_win_pct = (np.sum(sim_preds == 'Win') / N_SIM) * 100
-    mc_draw_pct = (np.sum(sim_preds == 'Draw') / N_SIM) * 100
-    mc_loss_pct = (np.sum(sim_preds == 'Loss') / N_SIM) * 100
+    # 【核心修复】：将频次胜率改为“期望胜率均值”，与下方连续分布图完美吻合
+    mc_win_pct = np.mean(sim_probs[:, win_idx]) * 100
+    mc_draw_pct = np.mean(sim_probs[:, draw_idx]) * 100
+    mc_loss_pct = np.mean(sim_probs[:, loss_idx]) * 100
 
     win_probs_series = sim_probs[:, win_idx]
     ci_lower = np.percentile(win_probs_series, 2.5) * 100
     ci_upper = np.percentile(win_probs_series, 97.5) * 100
 
-    # 移除“不败率”，改为 3 列展示胜、平、负，清晰无冗余
     m1, m2, m3 = st.columns(3)
     with m1:
-        st.markdown(f'<div class="metric-card-win"><div class="metric-title">模拟胜率 (WIN)</div><div class="metric-value-win">{mc_win_pct:.1f}%</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card-win"><div class="metric-title">期望胜率 (EXP WIN)</div><div class="metric-value-win">{mc_win_pct:.1f}%</div></div>', unsafe_allow_html=True)
     with m2:
-        st.markdown(f'<div class="metric-card-draw"><div class="metric-title">平局率 (DRAW)</div><div class="metric-value-draw">{mc_draw_pct:.1f}%</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card-draw"><div class="metric-title">期望平局 (EXP DRAW)</div><div class="metric-value-draw">{mc_draw_pct:.1f}%</div></div>', unsafe_allow_html=True)
     with m3:
-        st.markdown(f'<div class="metric-card-loss"><div class="metric-title">败率 (LOSS)</div><div class="metric-value-loss">{mc_loss_pct:.1f}%</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card-loss"><div class="metric-title">期望负率 (EXP LOSS)</div><div class="metric-value-loss">{mc_loss_pct:.1f}%</div></div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown(f"##### 📊 **95% 胜率置信区间 (Confidence Interval)**: `{ci_lower:.1f}%` ~ `{ci_upper:.1f}%`")
@@ -321,9 +319,9 @@ with tab2:
         ax_mc.set_facecolor('#1e293b')
         
         n_counts, bins, patches_hist = ax_mc.hist(win_probs_series * 100, bins=25, color='#00FF87', alpha=0.85, edgecolor='black', linewidth=1.2)
-        ax_mc.axvline(mc_win_pct, color='#FF0055', linestyle='--', linewidth=2.5, label=f'Mean Win ({mc_win_pct:.1f}%)')
+        ax_mc.axvline(mc_win_pct, color='#FF0055', linestyle='--', linewidth=2.5, label=f'Mean Expected Win ({mc_win_pct:.1f}%)')
         
-        ax_mc.set_title("1,000 Runs Win Probability Distribution", color='white', fontsize=11, fontweight='bold')
+        ax_mc.set_title("1,000 Runs Expected Win Probability Distribution", color='white', fontsize=11, fontweight='bold')
         ax_mc.set_xlabel("Predicted Win Probability (%)", color='#94a3b8', fontsize=9)
         ax_mc.set_ylabel("Frequency", color='#94a3b8', fontsize=9)
         ax_mc.tick_params(colors='white')
@@ -342,14 +340,15 @@ with tab2:
             alt_mapped = apply_formation_clash_engine(team_baseline, opp_baseline, alt_formation, opp_formation, scenario)
             alt_vector = np.array([[alt_mapped[f] for f in tactical_features]])
             alt_sim_inputs = np.clip(alt_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
-            alt_sim_preds = model.predict(alt_sim_inputs)
             
-            alt_win_pct = (np.sum(alt_sim_preds == 'Win') / N_SIM) * 100
+            # A/B 测试同样使用期望胜率
+            alt_sim_probs = model.predict_proba(alt_sim_inputs)
+            alt_win_pct = np.mean(alt_sim_probs[:, win_idx]) * 100
             diff = alt_win_pct - mc_win_pct
 
             st.divider()
-            st.metric(f"方案 A ({home_formation}) 胜率", f"{mc_win_pct:.1f}%")
-            st.metric(f"变阵 B ({alt_formation}) 胜率", f"{alt_win_pct:.1f}%", f"{diff:+.1f}%")
+            st.metric(f"方案 A ({home_formation}) 期望胜率", f"{mc_win_pct:.1f}%")
+            st.metric(f"变阵 B ({alt_formation}) 期望胜率", f"{alt_win_pct:.1f}%", f"{diff:+.1f}%")
 
             if diff > 3.0:
                 st.success(f"💡 **推荐变阵**：改打 **{alt_formation}** 阵型在此对位中存在战术克制优势！")
@@ -357,11 +356,11 @@ with tab2:
                 st.info("⚖️ 暂无明显变阵红利，建议沿用当前部署。")
 
 # =========================================================
-# TAB 3: 纯数据驱动的 XAI 归因视角
+# TAB 3: 教练直白简报 (XAI 降级为分析师折叠面板)
 # =========================================================
 with tab3:
-    st.subheader("🔍 单场模型归因分析 (Feature Attribution XAI)")
-    st.caption("基于随机森林特征重要性 (Feature Importances) 的透明度诊断，排除主观偏见，直观呈现胜负手。")
+    st.subheader("📑 赛前主帅执行简报 (Executive Brief)")
+    st.caption("提炼核心优势与劣势，供教练组直接布置针对性战术。")
 
     rf_importances = model.feature_importances_
     current_vals = input_vector[0]
@@ -372,7 +371,6 @@ with tab3:
         curr_val = current_vals[i]
         imp = rf_importances[i]
 
-        # PPDA 和犯规失误等负面指标反向计算
         if feat in ['ppda', 'fouls_committed', 'yellow_cards', 'errors_leading_to_shot']:
             diff = base_val - curr_val
         else:
@@ -382,60 +380,62 @@ with tab3:
         contributions.append((feat, curr_val, score))
 
     contributions.sort(key=lambda x: x[2], reverse=True)
-    top_positives = [c for c in contributions if c[2] > 0][:5]
-    top_negatives = [c for c in contributions if c[2] < 0][-5:]
+    top_positives = [c for c in contributions if c[2] > 0][:4]
+    top_negatives = [c for c in contributions if c[2] < 0][-4:]
 
-    col_data, col_xai = st.columns([1.0, 1.0])
-
-    with col_data:
-        with st.container(border=True):
-            st.markdown(f"### 🏟️ 对战数据基调")
-            st.caption(f"**{home_team}** ({home_formation}) vs **{away_team}** ({opp_formation})")
-            st.divider()
-
-            st.markdown("##### ✅ 模型判定核心优势指标")
+    with st.container(border=True):
+        st.markdown(f"### 🏟️ 赛前形势: {home_team} vs {away_team}")
+        st.caption(f"**我方阵型**：{home_formation} | **敌方阵型**：{opp_formation} | **当前情景**：{scenario}")
+        
+        col_pos, col_neg = st.columns(2)
+        
+        with col_pos:
+            st.markdown("##### ✅ 我方战术优势点")
             if top_positives:
                 for feat, val, score in top_positives:
-                    st.success(f"**{feat.upper()}** (当前值: `{val:.1f}`)")
+                    st.success(f"**{feat.upper()}** (当前盘面: `{val:.1f}`)")
             else:
-                st.caption("暂无明显数据优势")
+                st.caption("暂无明显数据优势，需临场调度。")
 
-            st.markdown("##### ⚠️ 模型判定潜在风险指标")
+        with col_neg:
+            st.markdown("##### ⚠️ 重点防范劣势")
             if top_negatives:
                 for feat, val, score in top_negatives:
-                    st.warning(f"**{feat.upper()}** (当前值: `{val:.1f}`)")
+                    st.warning(f"**{feat.upper()}** (当前盘面: `{val:.1f}`)")
             else:
-                st.caption("暂无明显风险指征")
+                st.caption("当前战术运转严密，风险受控。")
 
-            st.divider()
-            
-            # 精简纯粹的数据简报下载
-            report_text = f"# ⚽ 赛前战术数据简报: {home_team} vs {away_team}\n- 我方阵型: {home_formation}\n- 敌方阵型: {opp_formation}\n- 预测胜率: {mc_win_pct:.1f}%\n- 95% 置信区间: {ci_lower:.1f}% ~ {ci_upper:.1f}%\n\n---\n## ✅ 核心优势指标:\n"
-            report_text += "\n".join([f"- {f.upper()}: {v:.1f}" for f, v, s in top_positives]) + "\n\n"
-            report_text += "## ⚠️ 潜在风险指标:\n"
-            report_text += "\n".join([f"- {f.upper()}: {v:.1f}" for f, v, s in top_negatives])
+        st.divider()
+        report_text = f"# ⚽ 赛前战术简报: {home_team} vs {away_team}\n- 我方阵型: {home_formation}\n- 敌方阵型: {opp_formation}\n- 期望胜率: {mc_win_pct:.1f}%\n- 95% 置信区间: {ci_lower:.1f}% ~ {ci_upper:.1f}%\n\n---\n## ✅ 优势破局点:\n"
+        report_text += "\n".join([f"- {f.upper()}: {v:.1f}" for f, v, s in top_positives]) + "\n\n"
+        report_text += "## ⚠️ 严防劣势:\n"
+        report_text += "\n".join([f"- {f.upper()}: {v:.1f}" for f, v, s in top_negatives])
 
-            st.download_button(
-                label="📥 导出纯数据简报 (.md)",
-                data=report_text,
-                file_name=f"XAI_Attribution_{home_team}_vs_{away_team}.md",
-                mime="text/markdown"
-            )
+        st.download_button(
+            label="📥 导出 PDF/Markdown 战术简报 (供更衣室使用)",
+            data=report_text,
+            file_name=f"Executive_Brief_{home_team}_vs_{away_team}.md",
+            mime="text/markdown"
+        )
 
-    with col_xai:
-        st.markdown("#### 🔍 因子杠杆影响力 (Impact Visualization)")
-        top_xai = sorted(contributions, key=lambda x: abs(x[2]), reverse=True)[:8]
+    # 将晦涩的 XAI 图表降级处理，隐藏在折叠面板内
+    with st.expander("⚙️ 查看 AI 底层归因推演逻辑 (数据分析师视角)"):
+        st.markdown("该图表展示了随机森林模型计算胜负概率时，各个战术因子发挥的**杠杆影响力**。此部分通常由分析师用于录像剪辑溯源。")
+        
         xai_df = pd.DataFrame({
-            'Feature': [x[0] for x in top_xai],
-            'Contribution': [x[2] for x in top_xai]
+            'Feature': [x[0] for x in contributions],
+            'Contribution': [x[2] for x in contributions]
         }).sort_values(by='Contribution')
 
-        fig_xai, ax_xai = plt.subplots(figsize=(6, 4.2), facecolor='#0b0f19')
+        # 过滤掉贡献度为0的死特征，让图表更清爽
+        xai_df = xai_df[xai_df['Contribution'] != 0].tail(8) # 取绝对影响最大的8个
+
+        fig_xai, ax_xai = plt.subplots(figsize=(8, 3.5), facecolor='#0b0f19')
         ax_xai.set_facecolor('#1e293b')
         colors = ['#00FF87' if v >= 0 else '#FF0055' for v in xai_df['Contribution']]
         
         bars = ax_xai.barh(xai_df['Feature'], xai_df['Contribution'], color=colors, edgecolor='black', linewidth=1)
-        ax_xai.set_title("Tactical Drivers Impacting This Match", color='white', fontsize=10, fontweight='bold')
+        ax_xai.set_title("Match Attribution Drivers (Data Scientist View)", color='white', fontsize=10, fontweight='bold')
         ax_xai.tick_params(colors='white')
         plt.tight_layout()
         st.pyplot(fig_xai)
