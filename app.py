@@ -28,10 +28,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("⚽ Pro AI Tactical Decision Support System")
-st.caption("职业足球赛前博弈推演、阵型对位引擎与高对比度蒙特卡洛引擎 (Head Coach Efficiency Edition)")
+st.caption("职业足球赛前博弈推演、阵型对位引擎与 7 黄金特征蒙特卡洛引擎 (Head Coach Efficiency Edition)")
 
 # ---------------------------------------------------------
-# 2. 真实历史数据集与 ML 模型动态加载
+# 2. 真实历史数据集与 v2 版 ML 模型动态加载
 # ---------------------------------------------------------
 @st.cache_data
 def load_datasets():
@@ -40,7 +40,7 @@ def load_datasets():
 
 @st.cache_resource
 def load_model():
-    return joblib.load('world_cup_rf_model.pkl')
+    return joblib.load('world_cup_rf_model_v2.pkl')
 
 try:
     df_clean = load_datasets()
@@ -49,16 +49,14 @@ except Exception as e:
     st.sidebar.error(f"❌ 数据或模型加载失败: {e}")
     st.stop()
 
+# 核心 7 黄金特征定义 (与 v2 模型完全对齐)
 tactical_features = [
-    'xg', 'possession', 'shots_on_target', 'shots_total',
-    'passes_completed', 'pass_accuracy', 'ppda', 'tackles_successful',
-    'interceptions', 'clearances', 'fouls_committed', 'yellow_cards',
-    'corners', 'crosses_completed', 'aerial_duels_won_pct', 'errors_leading_to_shot'
+    'xg', 'possession', 'shots_on_target', 
+    'ppda', 'tackles_successful', 'interceptions', 'aerial_duels_won_pct'
 ]
 
 FEATURE_BASELINES = df_clean[tactical_features].mean().to_dict()
 
-# 阵型内在特征
 FORMATION_TACTICS = {
     "4-3-3": {"style": "控球高压", "color": "#FF0055", "line_x": 68, "label": "🔥 HIGH PRESS LINE"},
     "4-2-3-1": {"style": "常规平衡", "color": "#FACC15", "line_x": 55, "label": "⚖️ BALANCED LINE"},
@@ -69,9 +67,6 @@ FORMATION_TACTICS = {
     "4-1-4-1": {"style": "中场延误", "color": "#6366f1", "line_x": 45, "label": "🛑 DELAY & BLOCK"}
 }
 
-# ---------------------------------------------------------
-# 3. 2D 足球场绘制
-# ---------------------------------------------------------
 def draw_2d_pitch_enhanced(formation_name, team_name):
     fig, ax = plt.subplots(figsize=(6, 4.2), facecolor='#0b0f19')
     ax.set_facecolor('#1e293b')
@@ -137,14 +132,8 @@ st.sidebar.header("🎯 3. 比赛情景干预 (Scenarios)")
 scenario = st.sidebar.radio("比赛所处情景", ["常规开局 (0-0 Balanced)", "落后狂攻 (Press All Out)", "领先后缩 (Parking Bus)"], index=0)
 
 # ---------------------------------------------------------
-# 5. 纯阵型驱动的战术映射器
+# 5. 7 黄金维度阵型对弈引擎
 # ---------------------------------------------------------
-def scale_attack_metrics(mapped_stats, xg_multiplier):
-    mapped_stats['xg'] *= xg_multiplier
-    mapped_stats['shots_on_target'] = max(1.0, mapped_stats['shots_on_target'] * xg_multiplier)
-    mapped_stats['shots_total'] = max(mapped_stats['shots_on_target'] + 2.0, mapped_stats['shots_total'] * (1 + (xg_multiplier - 1) * 0.8))
-    return mapped_stats
-
 def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
     mapped = home_base.copy()
     
@@ -156,53 +145,44 @@ def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
     if h_form == "4-3-3":
         mapped['ppda'] *= 0.75
         mapped['possession'] *= 1.1
-        mapped = scale_attack_metrics(mapped, 1.15)
+        mapped['xg'] *= 1.15
+        mapped['shots_on_target'] *= 1.15
     elif h_form == "5-4-1":
         mapped['possession'] *= 0.75
         mapped['ppda'] *= 1.3
-        mapped['clearances'] *= 1.3
-        mapped = scale_attack_metrics(mapped, 0.8)
+        mapped['xg'] *= 0.8
+        mapped['shots_on_target'] *= 0.8
     elif h_form == "4-1-4-1":
         mapped['interceptions'] *= 1.25
         mapped['tackles_successful'] *= 1.15
         mapped['possession'] *= 0.95
     elif h_form == "3-4-3":
-        mapped['crosses_completed'] += 5.0
-        mapped = scale_attack_metrics(mapped, 1.2)
-        mapped['pass_accuracy'] -= 2.0 
+        mapped['xg'] *= 1.2
+        mapped['shots_on_target'] *= 1.2
     elif h_form == "3-5-2":
         mapped['possession'] *= 1.05
         mapped['tackles_successful'] *= 1.1
     elif h_form == "4-4-2":
         mapped['possession'] *= 0.9
-        mapped['passes_completed'] *= 0.85
 
     if a_form in ["4-3-3", "3-4-3"]:
         mapped['possession'] -= 5.0
         mapped['ppda'] -= 1.0
-        mapped['pass_accuracy'] -= 3.0
     elif a_form in ["5-4-1", "4-1-4-1"]:
         mapped['possession'] += 6.0
-        mapped['clearances'] += 3.0
-        mapped['passes_completed'] *= 1.15
     elif a_form in ["3-5-2", "4-2-3-1"]:
         mapped['tackles_successful'] += 2.0
-        mapped['fouls_committed'] += 2.0
 
     if scenario == "落后狂攻 (Press All Out)":
         mapped['ppda'] = 5.5
         mapped['tackles_successful'] += 5.0
-        mapped = scale_attack_metrics(mapped, xg_multiplier=1.2)
-        mapped['errors_leading_to_shot'] += 0.2
+        mapped['xg'] *= 1.2
+        mapped['shots_on_target'] *= 1.2
     elif scenario == "领先后缩 (Parking Bus)":
         mapped['possession'] = 33.0
         mapped['ppda'] = 20.0
-        mapped['clearances'] += 10.0
-        mapped = scale_attack_metrics(mapped, xg_multiplier=0.6)
-
-    if mapped['errors_leading_to_shot'] > 0:
-        mapped['xg'] = max(0.1, mapped['xg'] - (mapped['errors_leading_to_shot'] * 0.15))
-        mapped['pass_accuracy'] = max(50.0, mapped['pass_accuracy'] - 3.0)
+        mapped['xg'] *= 0.6
+        mapped['shots_on_target'] *= 0.6
 
     return mapped
 
@@ -218,7 +198,7 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 # =========================================================
-# TAB 1: 2D 足球场 + 面板
+# TAB 1: 2D 足球场 + 7 维动态面板
 # =========================================================
 with tab1:
     col_pitch, col_panel = st.columns([1.2, 1.0])
@@ -236,58 +216,44 @@ with tab1:
         k4.metric("成功抢断 Tackles", f"{mapped_stats['tackles_successful']:.1f}", f"{mapped_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}")
 
     with col_panel:
-        st.subheader("📋 细粒度战术微调 (Data Panel)")
-        st.caption("以下数据由 AI 阵型对弈引擎自动解算，您可基于球员伤停等状况手动干预：")
+        st.subheader("📋 精简黄金指标微调 (7 Golden Features)")
+        st.caption("以下数据由 AI 阵型对弈引擎自动解算，您可根据对局手动微调：")
 
-        # 核心修复点：生成一个由当前所有【侧边栏选项】拼接而成的动态 Key
-        # 只要这 5 个变量中有任何一个发生改变，ui_key 就会变
-        # Streamlit 发现 key 变了，就会把滑块当成全新的组件，从而强制重置为你设定的默认值
         ui_key = f"{home_team}_{away_team}_{home_formation}_{opp_formation}_{scenario}"
 
         with st.expander("🎯 进攻终结 (Attacking)", expanded=True):
             xg = st.slider("预期进球 (xG Target)", 0.1, 4.0, float(round(mapped_stats['xg'], 2)), 0.1, key=f"xg_{ui_key}")
             shots_on_target = st.slider("射正数 Target", 0, 15, int(round(mapped_stats['shots_on_target'])), key=f"sot_{ui_key}")
-            shots_total = st.slider("总射门数 Target", 1, 30, max(int(round(mapped_stats['shots_total'])), shots_on_target + 2), key=f"st_{ui_key}")
-            corners = st.slider("角球次数", 0, 15, int(round(mapped_stats['corners'])), key=f"cor_{ui_key}")
 
         with st.expander("🔄 组织控球 (Build-up)", expanded=False):
             possession = st.slider("控球率 (%)", 20, 80, int(round(mapped_stats['possession'])), key=f"poss_{ui_key}")
-            passes_completed = st.slider("成功传球数", 100, 900, int(round(mapped_stats['passes_completed'])), 10, key=f"pass_{ui_key}")
-            pass_accuracy = st.slider("传球成功率 (%)", 50, 98, int(round(mapped_stats['pass_accuracy'])), key=f"acc_{ui_key}")
-            crosses_completed = st.slider("成功传中数", 0, 25, int(round(mapped_stats['crosses_completed'])), key=f"cross_{ui_key}")
 
         with st.expander("🛡️ 防守压迫 (Defensive)", expanded=False):
             ppda = st.slider("PPDA (逼抢强度, 越低越高压)", 3.0, 30.0, float(round(mapped_stats['ppda'], 1)), 0.5, key=f"ppda_{ui_key}")
             tackles_successful = st.slider("成功抢断", 3, 40, int(round(mapped_stats['tackles_successful'])), key=f"tack_{ui_key}")
             interceptions = st.slider("拦截次数", 1, 30, int(round(mapped_stats['interceptions'])), key=f"int_{ui_key}")
-            clearances = st.slider("解围次数", 3, 50, int(round(mapped_stats['clearances'])), key=f"clear_{ui_key}")
 
-        with st.expander("⚔️ 对抗纪律 (Duels & Errors)", expanded=False):
+        with st.expander("⚔️ 对抗纪律 (Duels)", expanded=False):
             aerial_duels_won_pct = st.slider("争顶胜率 (%)", 20, 80, int(round(mapped_stats['aerial_duels_won_pct'])), key=f"aer_{ui_key}")
-            fouls_committed = st.slider("犯规次数", 1, 30, int(round(mapped_stats['fouls_committed'])), key=f"foul_{ui_key}")
-            yellow_cards = st.number_input("黄牌数", 0, 8, int(round(mapped_stats['yellow_cards'])), key=f"yc_{ui_key}")
-            errors_leading_to_shot = st.number_input("致命失误致射门", 0, 3, int(round(mapped_stats['errors_leading_to_shot'])), key=f"err_{ui_key}")
 
+# 7 维矢量输入
 input_vector = np.array([[
-    xg, possession, shots_on_target, shots_total,
-    passes_completed, pass_accuracy, ppda, tackles_successful,
-    interceptions, clearances, fouls_committed, yellow_cards,
-    corners, crosses_completed, aerial_duels_won_pct, errors_leading_to_shot
+    xg, possession, shots_on_target, ppda, tackles_successful, interceptions, aerial_duels_won_pct
 ]])
 
 # =========================================================
-# TAB 2: 高对比度蒙特卡洛引擎 (期望胜率连续分布版)
+# TAB 2: 7 维蒙特卡洛引擎
 # =========================================================
 with tab2:
     st.subheader("🎲 蒙特卡洛 1,000 场平行宇宙模拟 & 变阵诊判")
 
-    a_min_bounds = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-    a_max_bounds = np.array([10.0, 100.0, 30.0, 50.0, 1500.0, 100.0, 50.0, 60.0, 50.0, 80.0, 40.0, 11.0, 25.0, 40.0, 100.0, 10.0])
+    a_min_bounds = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+    a_max_bounds = np.array([10.0, 100.0, 30.0, 50.0, 60.0, 50.0, 100.0])
 
     N_SIM = 1000
     np.random.seed(42)
-    noise = np.random.normal(0, 1, (N_SIM, 16))
-    scale = np.array([0.15, 2.5, 0.8, 1.5, 25, 1.5, 0.8, 1.2, 1.0, 1.5, 1.0, 0.3, 0.8, 0.8, 2.0, 0.2])
+    noise = np.random.normal(0, 1, (N_SIM, 7))
+    scale = np.array([0.15, 2.5, 0.8, 0.8, 1.2, 1.0, 2.0])
     
     sim_inputs = np.clip(input_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
     sim_probs = model.predict_proba(sim_inputs)
@@ -297,7 +263,6 @@ with tab2:
     draw_idx = classes.index('Draw') if 'Draw' in classes else 0
     loss_idx = classes.index('Loss') if 'Loss' in classes else 1
 
-    # 【核心修复】：将频次胜率改为“期望胜率均值”，与下方连续分布图完美吻合
     mc_win_pct = np.mean(sim_probs[:, win_idx]) * 100
     mc_draw_pct = np.mean(sim_probs[:, draw_idx]) * 100
     mc_loss_pct = np.mean(sim_probs[:, loss_idx]) * 100
@@ -346,7 +311,6 @@ with tab2:
             alt_vector = np.array([[alt_mapped[f] for f in tactical_features]])
             alt_sim_inputs = np.clip(alt_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
             
-            # A/B 测试同样使用期望胜率
             alt_sim_probs = model.predict_proba(alt_sim_inputs)
             alt_win_pct = np.mean(alt_sim_probs[:, win_idx]) * 100
             diff = alt_win_pct - mc_win_pct
@@ -361,11 +325,11 @@ with tab2:
                 st.info("⚖️ 暂无明显变阵红利，建议沿用当前部署。")
 
 # =========================================================
-# TAB 3: 教练直白简报 (XAI 降级为分析师折叠面板)
+# TAB 3: 简报与 XAI 折叠面板
 # =========================================================
 with tab3:
     st.subheader("📑 赛前主帅执行简报 (Executive Brief)")
-    st.caption("提炼核心优势与劣势，供教练组直接布置针对性战术。")
+    st.caption("提炼 7 大黄金指标中的核心优势与劣势，供教练组直接布置针对性战术。")
 
     rf_importances = model.feature_importances_
     current_vals = input_vector[0]
@@ -376,7 +340,7 @@ with tab3:
         curr_val = current_vals[i]
         imp = rf_importances[i]
 
-        if feat in ['ppda', 'fouls_committed', 'yellow_cards', 'errors_leading_to_shot']:
+        if feat == 'ppda':
             diff = base_val - curr_val
         else:
             diff = curr_val - base_val
@@ -385,8 +349,8 @@ with tab3:
         contributions.append((feat, curr_val, score))
 
     contributions.sort(key=lambda x: x[2], reverse=True)
-    top_positives = [c for c in contributions if c[2] > 0][:4]
-    top_negatives = [c for c in contributions if c[2] < 0][-4:]
+    top_positives = [c for c in contributions if c[2] > 0][:3]
+    top_negatives = [c for c in contributions if c[2] < 0][-3:]
 
     with st.container(border=True):
         st.markdown(f"### 🏟️ 赛前形势: {home_team} vs {away_team}")
@@ -395,7 +359,7 @@ with tab3:
         col_pos, col_neg = st.columns(2)
         
         with col_pos:
-            st.markdown("##### ✅ 我方战术优势点")
+            st.markdown("##### ✅ 我方黄金优势点")
             if top_positives:
                 for feat, val, score in top_positives:
                     st.success(f"**{feat.upper()}** (当前盘面: `{val:.1f}`)")
@@ -423,24 +387,20 @@ with tab3:
             mime="text/markdown"
         )
 
-    # 将晦涩的 XAI 图表降级处理，隐藏在折叠面板内
     with st.expander("⚙️ 查看 AI 底层归因推演逻辑 (数据分析师视角)"):
-        st.markdown("该图表展示了随机森林模型计算胜负概率时，各个战术因子发挥的**杠杆影响力**。此部分通常由分析师用于录像剪辑溯源。")
+        st.markdown("该图表展示了随机森林模型计算胜负概率时，7 大黄金战术因子发挥的**杠杆影响力**。")
         
         xai_df = pd.DataFrame({
             'Feature': [x[0] for x in contributions],
             'Contribution': [x[2] for x in contributions]
         }).sort_values(by='Contribution')
 
-        # 过滤掉贡献度为0的死特征，让图表更清爽
-        xai_df = xai_df[xai_df['Contribution'] != 0].tail(8) # 取绝对影响最大的8个
-
         fig_xai, ax_xai = plt.subplots(figsize=(8, 3.5), facecolor='#0b0f19')
         ax_xai.set_facecolor('#1e293b')
         colors = ['#00FF87' if v >= 0 else '#FF0055' for v in xai_df['Contribution']]
         
         bars = ax_xai.barh(xai_df['Feature'], xai_df['Contribution'], color=colors, edgecolor='black', linewidth=1)
-        ax_xai.set_title("Match Attribution Drivers (Data Scientist View)", color='white', fontsize=10, fontweight='bold')
+        ax_xai.set_title("7 Golden Drivers Impacting This Match", color='white', fontsize=10, fontweight='bold')
         ax_xai.tick_params(colors='white')
         plt.tight_layout()
         st.pyplot(fig_xai)
