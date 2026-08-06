@@ -17,41 +17,10 @@ st.set_page_config(
 st.markdown("""
     <style>
     .main { background-color: #0b0f19; }
-    
-    /* 高对比度视觉勋章卡片 */
-    .metric-card-win {
-        background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
-        border: 2px solid #00FF87;
-        border-radius: 10px;
-        padding: 14px;
-        text-align: center;
-        box-shadow: 0 0 12px rgba(0, 255, 135, 0.2);
-    }
-    .metric-card-draw {
-        background: linear-gradient(135deg, #713f12 0%, #451a03 100%);
-        border: 2px solid #FACC15;
-        border-radius: 10px;
-        padding: 14px;
-        text-align: center;
-        box-shadow: 0 0 12px rgba(250, 204, 21, 0.2);
-    }
-    .metric-card-loss {
-        background: linear-gradient(135deg, #881337 0%, #4c0519 100%);
-        border: 2px solid #FF0055;
-        border-radius: 10px;
-        padding: 14px;
-        text-align: center;
-        box-shadow: 0 0 12px rgba(255, 0, 85, 0.2);
-    }
-    .metric-card-undefeated {
-        background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
-        border: 2px solid #38BDF8;
-        border-radius: 10px;
-        padding: 14px;
-        text-align: center;
-        box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
-    }
-    
+    .metric-card-win { background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); border: 2px solid #00FF87; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
+    .metric-card-draw { background: linear-gradient(135deg, #713f12 0%, #451a03 100%); border: 2px solid #FACC15; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(250, 204, 21, 0.2); }
+    .metric-card-loss { background: linear-gradient(135deg, #881337 0%, #4c0519 100%); border: 2px solid #FF0055; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(255, 0, 85, 0.2); }
+    .metric-card-undefeated { background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%); border: 2px solid #38BDF8; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(56, 189, 248, 0.2); }
     .metric-title { color: #94a3b8; font-size: 13px; font-weight: 600; text-transform: uppercase; }
     .metric-value-win { color: #00FF87; font-size: 28px; font-weight: 800; }
     .metric-value-draw { color: #FACC15; font-size: 28px; font-weight: 800; }
@@ -61,7 +30,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("⚽ Pro AI Tactical Decision Support System")
-st.caption("职业足球赛前博弈推演、审计级战术映射与高对比度蒙特卡洛引擎 (Audited Coach Edition)")
+st.caption("职业足球赛前博弈推演、阵型对位引擎与高对比度蒙特卡洛引擎 (Formation-Driven Edition)")
 
 # ---------------------------------------------------------
 # 2. 真实历史数据集与 ML 模型动态加载
@@ -69,22 +38,19 @@ st.caption("职业足球赛前博弈推演、审计级战术映射与高对比�
 @st.cache_data
 def load_datasets():
     df_clean = pd.read_csv('clean_world_cup_2022.csv')
-    df_raw = pd.read_csv('data.csv')
-    return df_clean, df_raw
+    return df_clean
 
 @st.cache_resource
 def load_model():
     return joblib.load('world_cup_rf_model.pkl')
 
 try:
-    df_clean, df_raw = load_datasets()
+    df_clean = load_datasets()
     model = load_model()
-    st.sidebar.success("✅ 2022 世界杯真实数据集 & ML 模型加载成功")
 except Exception as e:
     st.sidebar.error(f"❌ 数据或模型加载失败: {e}")
     st.stop()
 
-# 16 个底层特征定义
 tactical_features = [
     'xg', 'possession', 'shots_on_target', 'shots_total',
     'passes_completed', 'pass_accuracy', 'ppda', 'tackles_successful',
@@ -94,35 +60,35 @@ tactical_features = [
 
 FEATURE_BASELINES = df_clean[tactical_features].mean().to_dict()
 
+# 定义阵型的内在战术特征字典 (取代手动战术选择)
+FORMATION_TACTICS = {
+    "4-3-3": {"style": "控球高压", "color": "#FF0055", "line_x": 68, "label": "🔥 HIGH PRESS LINE"},
+    "4-2-3-1": {"style": "常规平衡", "color": "#FACC15", "line_x": 55, "label": "⚖️ BALANCED LINE"},
+    "3-5-2": {"style": "中路控制", "color": "#00FF87", "line_x": 50, "label": "🔄 MIDFIELD CONTROL"},
+    "4-4-2": {"style": "传统反击", "color": "#38BDF8", "line_x": 40, "label": "⚡ COUNTER LINE"},
+    "5-4-1": {"style": "低位防反", "color": "#3b82f6", "line_x": 25, "label": "🛡️ LOW BLOCK LINE"},
+    "3-4-3": {"style": "边路强攻", "color": "#a855f7", "line_x": 65, "label": "⚔️ WIDE OVERLOAD"},
+    "4-1-4-1": {"style": "中场延误", "color": "#6366f1", "line_x": 45, "label": "🛑 DELAY & BLOCK"}
+}
+
 # ---------------------------------------------------------
-# 3. 2D 足球场绘制 (含战术落位图层)
+# 3. 2D 足球场绘制 (含 4-1-4-1 及动态图层)
 # ---------------------------------------------------------
-def draw_2d_pitch_enhanced(formation_name, team_name, tactical_style):
+def draw_2d_pitch_enhanced(formation_name, team_name):
     fig, ax = plt.subplots(figsize=(6, 4.2), facecolor='#0b0f19')
     ax.set_facecolor('#1e293b')
 
-    # 画外场线与中线
+    # 外场线与禁区
     ax.plot([0, 0, 100, 100, 0], [0, 100, 100, 0, 0], color="white", alpha=0.3, linewidth=1.5)
     ax.plot([50, 50], [0, 100], color="white", alpha=0.3, linewidth=1.5)
-    
-    # 画中圈与禁区
-    center_circle = patches.Circle((50, 50), 12, color="white", fill=False, alpha=0.3, linewidth=1.5)
-    left_penalty = patches.Rectangle((0, 20), 18, 60, color="white", fill=False, alpha=0.3, linewidth=1.5)
-    right_penalty = patches.Rectangle((82, 20), 18, 60, color="white", fill=False, alpha=0.3, linewidth=1.5)
-    ax.add_patch(center_circle)
-    ax.add_patch(left_penalty)
-    ax.add_patch(right_penalty)
+    ax.add_patch(patches.Circle((50, 50), 12, color="white", fill=False, alpha=0.3, linewidth=1.5))
+    ax.add_patch(patches.Rectangle((0, 20), 18, 60, color="white", fill=False, alpha=0.3, linewidth=1.5))
+    ax.add_patch(patches.Rectangle((82, 20), 18, 60, color="white", fill=False, alpha=0.3, linewidth=1.5))
 
-    # 动态战术图层
-    if "高位逼抢" in tactical_style:
-        ax.axvline(x=68, color='#FF0055', linestyle='--', linewidth=2, alpha=0.8)
-        ax.text(69, 92, '🔥 HIGH PRESS LINE', color='#FF0055', fontsize=8, fontweight='bold')
-    elif "低位反击" in tactical_style:
-        ax.axvline(x=32, color='#38BDF8', linestyle='--', linewidth=2, alpha=0.8)
-        ax.text(33, 92, '🛡️ LOW BLOCK LINE', color='#38BDF8', fontsize=8, fontweight='bold')
-    elif "控球主导" in tactical_style:
-        ax.axvline(x=50, color='#00FF87', linestyle='--', linewidth=2, alpha=0.8)
-        ax.text(51, 92, '🔄 MIDFIELD CONTROL', color='#00FF87', fontsize=8, fontweight='bold')
+    # 提取该阵型的默认战术线与标签
+    tactic_info = FORMATION_TACTICS[formation_name]
+    ax.axvline(x=tactic_info["line_x"], color=tactic_info["color"], linestyle='--', linewidth=2, alpha=0.8)
+    ax.text(tactic_info["line_x"] + 1, 92, tactic_info["label"], color=tactic_info["color"], fontsize=8, fontweight='bold')
 
     formations_coords = {
         "4-3-3": [(8,50), (28,18), (25,38), (25,62), (28,82), (50,28), (45,50), (50,72), (80,20), (85,50), (80,80)],
@@ -130,7 +96,9 @@ def draw_2d_pitch_enhanced(formation_name, team_name, tactical_style):
         "3-5-2": [(8,50), (25,28), (23,50), (25,72), (45,15), (48,35), (45,50), (48,65), (45,85), (82,38), (82,62)],
         "4-4-2": [(8,50), (28,18), (25,38), (25,62), (28,82), (52,18), (50,38), (50,62), (52,82), (82,38), (82,62)],
         "5-4-1": [(8,50), (28,12), (25,31), (23,50), (25,69), (28,88), (50,20), (48,40), (48,60), (50,80), (82,50)],
-        "3-4-3": [(8,50), (25,28), (23,50), (25,72), (50,18), (48,38), (48,62), (50,82), (80,20), (85,50), (80,80)]
+        "3-4-3": [(8,50), (25,28), (23,50), (25,72), (50,18), (48,38), (48,62), (50,82), (80,20), (85,50), (80,80)],
+        # 新增 4-1-4-1 坐标 (守门员，4后卫，1后腰，4前卫，1单前锋)
+        "4-1-4-1": [(8,50), (28,18), (25,38), (25,62), (28,82), (40,50), (60,18), (60,38), (60,62), (60,82), (82,50)]
     }
 
     coords = formations_coords.get(formation_name, formations_coords["4-3-3"])
@@ -144,119 +112,123 @@ def draw_2d_pitch_enhanced(formation_name, team_name, tactical_style):
     ax.set_xlim(-2, 102)
     ax.set_ylim(-2, 102)
     ax.axis('off')
-    ax.set_title(f"{team_name} ({formation_name}) - {tactical_style}", color='white', fontsize=11, pad=10)
+    # 标题不再显示手动战术，而是直接显示阵型关联的内在风格
+    ax.set_title(f"{team_name} [{formation_name} | {tactic_info['style']}]", color='white', fontsize=11, pad=10)
     plt.tight_layout()
     return fig
 
 # ---------------------------------------------------------
-# 4. 侧边栏设置 (数据驱动对阵与战术选择)
+# 4. 侧边栏设置 (极简阵型驱动设计)
 # ---------------------------------------------------------
-st.sidebar.header("⚙️ 1. 比赛对阵设置 (Data-Driven)")
+st.sidebar.header("⚙️ 1. 比赛对位设置 (Matchup)")
 all_teams = sorted(df_clean['team'].unique().tolist())
 
 col_h, col_a = st.sidebar.columns(2)
 home_team = col_h.selectbox("我方球队", all_teams, index=all_teams.index("Argentina") if "Argentina" in all_teams else 0)
 away_team = col_a.selectbox("对手球队", all_teams, index=all_teams.index("France") if "France" in all_teams else 1)
 
-# 动态计算我方与对手球队在 2022 世界杯的真实场均数据作为 Baseline
 home_data = df_clean[df_clean['team'] == home_team]
 away_data = df_clean[df_clean['team'] == away_team]
-
 team_baseline = home_data[tactical_features].mean().to_dict() if not home_data.empty else FEATURE_BASELINES.copy()
 opp_baseline = away_data[tactical_features].mean().to_dict() if not away_data.empty else FEATURE_BASELINES.copy()
 
 st.sidebar.markdown("---")
-st.sidebar.header("📐 2. 阵型与战术意图 (Stage 1 Mapper)")
+st.sidebar.header("📐 2. 阵型沙盘博弈 (Formations)")
+formation_list = list(FORMATION_TACTICS.keys())
 
-formation = st.sidebar.selectbox("我方部署阵型", ["4-3-3", "4-2-3-1", "3-5-2", "4-4-2", "5-4-1", "3-4-3"])
-tactical_style = st.sidebar.selectbox("我方主导战术", ["常规平衡 (Balanced)", "高位逼抢 (High Pressing)", "低位反击 (Low Block Counter)", "控球主导 (Possession Focus)"])
-opp_style = st.sidebar.selectbox("对手战术风格", ["常规平衡 (Balanced)", "高位逼抢 (High Press)", "传控主导 (Tiki-Taka)", "低位摆大巴 (Low Block)", "快速反击 (Counter Attack)"])
+# 完全删除冗余的战术主导选项，仅保留阵型对抗
+home_formation = st.sidebar.selectbox("我方部署阵型 (Our Formation)", formation_list, index=0)
+opp_formation = st.sidebar.selectbox("敌方部署阵型 (Opp Formation)", formation_list, index=1)
 
 st.sidebar.markdown("---")
-st.sidebar.header("🎯 3. 一键战术情景 (Scenario)")
-scenario = st.sidebar.radio("战术倾向选择", ["常规推演 (Balanced)", "全员激进压迫 (Press All Out)", "极端防守摆大巴 (Parking Bus)", "全线压上攻坚 (Ultra Attack)"], index=0)
+st.sidebar.header("🎯 3. 比赛情景干预 (Scenarios)")
+scenario = st.sidebar.radio("比赛所处情景", ["常规开局 (0-0 Balanced)", "落后狂攻 (Press All Out)", "领先后缩 (Parking Bus)"], index=0)
 
 # ---------------------------------------------------------
-# 5. 审计级 Stage 1 战术映射器逻辑 (含漏洞修复)
+# 5. 纯阵型驱动的战术映射器 (Formation Clash Engine)
 # ---------------------------------------------------------
 def scale_attack_metrics(mapped_stats, xg_multiplier):
-    """漏洞 3 修复：进攻指标物理比例同步缩放"""
     mapped_stats['xg'] *= xg_multiplier
     mapped_stats['shots_on_target'] = max(1.0, mapped_stats['shots_on_target'] * xg_multiplier)
     mapped_stats['shots_total'] = max(mapped_stats['shots_on_target'] + 2.0, mapped_stats['shots_total'] * (1 + (xg_multiplier - 1) * 0.8))
     return mapped_stats
 
-def apply_error_and_card_penalty(mapped_stats):
-    """漏洞 2 修复：模型死特征代理惩罚代换"""
-    if mapped_stats['errors_leading_to_shot'] > 0:
-        penalty = mapped_stats['errors_leading_to_shot'] * 0.15
-        mapped_stats['xg'] = max(0.1, mapped_stats['xg'] - penalty)
-        mapped_stats['pass_accuracy'] = max(50.0, mapped_stats['pass_accuracy'] - 3.0)
-    if mapped_stats['yellow_cards'] >= 2:
-        mapped_stats['tackles_successful'] *= 0.85
-        mapped_stats['ppda'] += 1.5
-    return mapped_stats
-
-def apply_tactical_mapping_audited(home_base, opp_base, style, opp_style, scenario):
+def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
     mapped = home_base.copy()
     
-    # 漏洞 4 修复：对位强弱修正因子 (Matchup Adjustment Factor)
+    # A. 球队实力底蕴修正因子 (历史对位对冲)
     xg_diff_factor = (home_base['xg'] - opp_base['xg']) * 0.1
     poss_diff_factor = (home_base['possession'] - opp_base['possession']) * 0.15
-
     mapped['xg'] = max(0.2, mapped['xg'] + xg_diff_factor)
     mapped['possession'] = np.clip(mapped['possession'] + poss_diff_factor, 25.0, 75.0)
 
-    # A. 我方战术指令 (物理联动更新)
-    if style == "高位逼抢 (High Pressing)":
-        mapped['ppda'] = max(4.0, mapped['ppda'] * 0.7)
-        mapped['tackles_successful'] *= 1.2
-        mapped = scale_attack_metrics(mapped, xg_multiplier=1.15)
-        mapped['errors_leading_to_shot'] += 0.2
-    elif style == "低位反击 (Low Block Counter)":
-        mapped['possession'] = min(42.0, mapped['possession'] * 0.75)
-        mapped['ppda'] *= 1.4
+    # B. 我方阵型物理特性映射 (Inherent Tactical Style)
+    if h_form == "4-3-3": # 控球与压迫
+        mapped['ppda'] *= 0.75
+        mapped['possession'] *= 1.1
+        mapped = scale_attack_metrics(mapped, 1.15)
+    elif h_form == "5-4-1": # 低位大巴
+        mapped['possession'] *= 0.75
+        mapped['ppda'] *= 1.3
         mapped['clearances'] *= 1.3
-        mapped['passes_completed'] *= 0.8
-        mapped = scale_attack_metrics(mapped, xg_multiplier=0.85)
-    elif style == "控球主导 (Possession Focus)":
-        mapped['possession'] = np.clip(mapped['possession'] * 1.15, 58.0, 78.0)
-        mapped['passes_completed'] *= 1.2
-        mapped['pass_accuracy'] = min(94.0, mapped['pass_accuracy'] * 1.05)
+        mapped = scale_attack_metrics(mapped, 0.8)
+    elif h_form == "4-1-4-1": # 单后腰绞杀与延误
+        mapped['interceptions'] *= 1.25
+        mapped['tackles_successful'] *= 1.15
+        mapped['possession'] *= 0.95
+    elif h_form == "3-4-3": # 边路激进强攻
+        mapped['crosses_completed'] += 5.0
+        mapped = scale_attack_metrics(mapped, 1.2)
+        mapped['pass_accuracy'] -= 2.0 
+    elif h_form == "3-5-2": # 中路密集
+        mapped['possession'] *= 1.05
+        mapped['tackles_successful'] *= 1.1
+    elif h_form == "4-4-2": # 平衡反击
+        mapped['possession'] *= 0.9
+        mapped['passes_completed'] *= 0.85
 
-    # B. 对手风格制约
-    if opp_style == "高位逼抢 (High Press)":
-        mapped['ppda'] = max(4.0, mapped['ppda'] - 1.5)
-        mapped['pass_accuracy'] = max(60.0, mapped['pass_accuracy'] - 4.0)
-    elif opp_style == "低位摆大巴 (Low Block)":
-        mapped['possession'] = min(78.0, mapped['possession'] + 8.0)
-        mapped['clearances'] += 6.0
+    # C. 敌方阵型制约特性 (Opponent Clash Influence)
+    if a_form in ["4-3-3", "3-4-3"]: # 敌方激进，我方控球受压
+        mapped['possession'] -= 5.0
+        mapped['ppda'] -= 1.0 # 比赛节奏加快
+        mapped['pass_accuracy'] -= 3.0
+    elif a_form in ["5-4-1", "4-1-4-1"]: # 敌方保守大巴/延误，我方主导
+        mapped['possession'] += 6.0
+        mapped['clearances'] += 3.0
+        mapped['passes_completed'] *= 1.15
+    elif a_form in ["3-5-2", "4-2-3-1"]: # 敌方中场强势绞杀
+        mapped['tackles_successful'] += 2.0
+        mapped['fouls_committed'] += 2.0
 
-    # C. 情景微调
-    if scenario == "全员激进压迫 (Press All Out)":
+    # D. 赛况干预
+    if scenario == "落后狂攻 (Press All Out)":
         mapped['ppda'] = 5.5
         mapped['tackles_successful'] += 5.0
         mapped = scale_attack_metrics(mapped, xg_multiplier=1.2)
-    elif scenario == "极端防守摆大巴 (Parking Bus)":
+        mapped['errors_leading_to_shot'] += 0.2
+    elif scenario == "领先后缩 (Parking Bus)":
         mapped['possession'] = 33.0
         mapped['ppda'] = 20.0
         mapped['clearances'] += 10.0
         mapped = scale_attack_metrics(mapped, xg_multiplier=0.6)
 
-    # D. 代理惩罚代换
-    mapped = apply_error_and_card_penalty(mapped)
+    # 代理死特征修复
+    if mapped['errors_leading_to_shot'] > 0:
+        mapped['xg'] = max(0.1, mapped['xg'] - (mapped['errors_leading_to_shot'] * 0.15))
+        mapped['pass_accuracy'] = max(50.0, mapped['pass_accuracy'] - 3.0)
 
     return mapped
 
-mapped_stats = apply_tactical_mapping_audited(team_baseline, opp_baseline, tactical_style, opp_style, scenario)
+mapped_stats = apply_formation_clash_engine(team_baseline, opp_baseline, home_formation, opp_formation, scenario)
+st.sidebar.caption(f"💡 指标已通过阵型对位引擎 [{home_formation} vs {opp_formation}] 自动解算。")
 
 # ---------------------------------------------------------
 # 6. Tab 选项卡主界面排版
 # ---------------------------------------------------------
 tab1, tab2, tab3 = st.tabs([
-    "🏟️ 1. 赛前阵型与战术部署 (Tactical Pitch)",
-    "🎲 2. 蒙特卡洛模拟与胜率诊断 (Monte Carlo Engine)",
-    "📑 3. AI 临场决策与战术报告 (Executive Brief)"
+    "🏟️ 1. 战术沙盘微调 (Tactical Board)",
+    "🎲 2. 蒙特卡洛胜率诊断 (Monte Carlo Engine)",
+    "📑 3. 临场决策与战术报告 (Executive Brief)"
 ])
 
 # =========================================================
@@ -266,11 +238,11 @@ with tab1:
     col_pitch, col_panel = st.columns([1.2, 1.0])
 
     with col_pitch:
-        st.subheader("🏟️ 2D 战术阵型部署与意图图层")
-        fig_pitch = draw_2d_pitch_enhanced(formation, home_team, tactical_style)
+        st.subheader("🏟️ 阵型对弈与防线落位图层")
+        fig_pitch = draw_2d_pitch_enhanced(home_formation, home_team)
         st.pyplot(fig_pitch)
 
-        st.markdown("##### 📈 战术部署对 KPI 的预期影响 (vs 历史基准)")
+        st.markdown("##### 📈 阵型博弈对球队 KPI 的预期影响")
         k1, k2, k3, k4 = st.columns(4)
         k1.metric("预期进球 xG", f"{mapped_stats['xg']:.2f}", f"{mapped_stats['xg'] - team_baseline['xg']:+.2f}")
         k2.metric("控球率 Possession", f"{mapped_stats['possession']:.1f}%", f"{mapped_stats['possession'] - team_baseline['possession']:+.1f}%")
@@ -278,8 +250,8 @@ with tab1:
         k4.metric("成功抢断 Tackles", f"{mapped_stats['tackles_successful']:.1f}", f"{mapped_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}")
 
     with col_panel:
-        st.subheader("📋 战术指令微调 (Tactical Panel)")
-        st.caption("系统已生成推算值，教练组可手动微调：")
+        st.subheader("📋 细粒度战术微调 (Data Panel)")
+        st.caption("以下数据由 AI 阵型对弈引擎自动解算，您可基于球员伤停等状况手动干预：")
 
         with st.expander("🎯 进攻终结 (Attacking)", expanded=True):
             xg = st.slider("预期进球 (xG Target)", 0.1, 4.0, float(round(mapped_stats['xg'], 2)), 0.1)
@@ -313,12 +285,11 @@ input_vector = np.array([[
 ]])
 
 # =========================================================
-# TAB 2: 高对比度蒙特卡洛引擎 (含漏洞 1 物理上下界硬约束)
+# TAB 2: 高对比度蒙特卡洛引擎 (阵型 A/B 测试)
 # =========================================================
 with tab2:
-    st.subheader("🎲 蒙特卡洛 1,000 场平行宇宙模拟 & 高对比度诊判")
+    st.subheader("🎲 蒙特卡洛 1,000 场平行宇宙模拟 & 变阵诊判")
 
-    # 漏洞 1 修复：16 维特征的物理上下界硬约束
     a_min_bounds = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     a_max_bounds = np.array([10.0, 100.0, 30.0, 50.0, 1500.0, 100.0, 50.0, 60.0, 50.0, 80.0, 40.0, 11.0, 25.0, 40.0, 100.0, 10.0])
 
@@ -343,7 +314,6 @@ with tab2:
     ci_lower = np.percentile(win_probs_series, 2.5) * 100
     ci_upper = np.percentile(win_probs_series, 97.5) * 100
 
-    # 重构高对比度视觉 Metric 勋章
     m1, m2, m3, m4 = st.columns(4)
     with m1:
         st.markdown(f'<div class="metric-card-win"><div class="metric-title">模拟胜率 (WIN)</div><div class="metric-value-win">{mc_win_pct:.1f}%</div></div>', unsafe_allow_html=True)
@@ -376,13 +346,13 @@ with tab2:
 
     with col_ab:
         with st.container(border=True):
-            st.markdown("#### ⚖️ 战术方案 A/B 对比矩阵")
-            alt_style = st.selectbox(
-                "选择备选方案 B 战术",
-                ["低位反击 (Low Block Counter)", "高位逼抢 (High Pressing)", "控球主导 (Possession Focus)", "常规平衡 (Balanced)"]
+            st.markdown("#### ⚖️ 换阵 A/B 对比矩阵")
+            alt_formation = st.selectbox(
+                "若我方改打备选阵型 (Plan B)",
+                [f for f in formation_list if f != home_formation]
             )
 
-            alt_mapped = apply_tactical_mapping_audited(team_baseline, opp_baseline, alt_style, opp_style, scenario)
+            alt_mapped = apply_formation_clash_engine(team_baseline, opp_baseline, alt_formation, opp_formation, scenario)
             alt_vector = np.array([[alt_mapped[f] for f in tactical_features]])
             alt_sim_inputs = np.clip(alt_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
             alt_sim_preds = model.predict(alt_sim_inputs)
@@ -391,16 +361,16 @@ with tab2:
             diff = alt_win_pct - mc_win_pct
 
             st.divider()
-            st.metric("方案 A 预测胜率", f"{mc_win_pct:.1f}%")
-            st.metric("方案 B 预测胜率", f"{alt_win_pct:.1f}%", f"{diff:+.1f}%")
+            st.metric(f"方案 A ({home_formation}) 胜率", f"{mc_win_pct:.1f}%")
+            st.metric(f"变阵 B ({alt_formation}) 胜率", f"{alt_win_pct:.1f}%", f"{diff:+.1f}%")
 
             if diff > 3.0:
-                st.success(f"💡 **推荐方案 B**：改用 **{alt_style}** 胜率更优！")
+                st.success(f"💡 **推荐变阵**：改打 **{alt_formation}** 阵型在此对位中存在战术克制优势！")
             else:
-                st.info("⚖️ 方案 A 保持优势，建议沿用当前部署。")
+                st.info("⚖️ 暂无明显变阵红利，建议沿用当前部署。")
 
 # =========================================================
-# TAB 3: XAI 归因与动态教练报告 + Markdown 下载
+# TAB 3: XAI 归因与动态教练报告
 # =========================================================
 with tab3:
     st.subheader("📑 赛前战术决策报告 (Executive Brief)")
@@ -429,9 +399,9 @@ with tab3:
     dynamic_directives = []
     for feat, val, score in top_negatives:
         if feat == 'ppda':
-            dynamic_directives.append(f"🔥 **优化压迫节奏**：PPDA (`{val:.1f}`)。建议提升中前场抢断效率。")
+            dynamic_directives.append(f"🔥 **优化压迫节奏**：PPDA (`{val:.1f}`)。受敌方 {opp_formation} 站位影响，应警惕中前场拦截效率下降。")
         elif feat == 'xg':
-            dynamic_directives.append(f"🎯 **提升终结质量**：当前 xG 仅为 `{val:.2f}`。增加远射或定位球威胁。")
+            dynamic_directives.append(f"🎯 **提升终结质量**：当前 xG 仅为 `{val:.2f}`。需通过定位球或两肋直塞化解 {opp_formation} 防线。")
         elif feat == 'possession':
             dynamic_directives.append(f"⚡ **加快转化速度**：控球率 `{val:.0f}%`，应提速减少无效传导。")
 
@@ -443,19 +413,19 @@ with tab3:
     with col_report:
         with st.container(border=True):
             st.markdown(f"### 🏟️ {home_team} vs {away_team}")
-            st.caption(f"**我方阵型**：{formation} | **主导战术**：{tactical_style} | **对手风格**：{opp_style}")
+            st.caption(f"**我方**：{home_formation} | **敌方**：{opp_formation} | **情景**：{scenario}")
             st.divider()
 
-            st.markdown("##### ✅ 本场战术优势红利")
+            st.markdown("##### ✅ 阵型克制与优势红利")
             for feat, val, score in top_positives:
                 st.success(f"**{feat.upper()}** (`{val:.1f}`): 正向加成胜率")
 
-            st.markdown("##### ⚠️ 关键战术风险点")
+            st.markdown("##### ⚠️ 对位劣势与风险点")
             for feat, val, score in top_negatives:
                 st.warning(f"**{feat.upper()}** (`{val:.1f}`): 拖累当前战术掌控力")
 
             st.divider()
-            report_text = f"# ⚽ 赛前战术简报: {home_team} vs {away_team}\n- 预测胜率: {mc_win_pct:.1f}%\n- 95% 置信区间: {ci_lower:.1f}% ~ {ci_upper:.1f}%\n\n---\n## 💡 临场指挥指令:\n" + "\n".join([f"{i}. {d}" for i, d in enumerate(dynamic_directives, 1)])
+            report_text = f"# ⚽ 赛前战术简报: {home_team} vs {away_team}\n- 我方阵型: {home_formation}\n- 敌方阵型: {opp_formation}\n- 预测胜率: {mc_win_pct:.1f}%\n- 95% 置信区间: {ci_lower:.1f}% ~ {ci_upper:.1f}%\n\n---\n## 💡 临场指挥指令:\n" + "\n".join([f"{i}. {d}" for i, d in enumerate(dynamic_directives, 1)])
             
             st.download_button(
                 label="📥 一键下载赛前战术简报 (.md)",
@@ -465,7 +435,7 @@ with tab3:
             )
 
     with col_xai:
-        st.markdown("#### 🔍 单场战术归因 (XAI High-Contrast)")
+        st.markdown("#### 🔍 阵型对峙因子归因 (XAI Matchup Drivers)")
         top_xai = sorted(contributions, key=lambda x: abs(x[2]), reverse=True)[:6]
         xai_df = pd.DataFrame({
             'Feature': [x[0] for x in top_xai],
