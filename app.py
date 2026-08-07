@@ -298,9 +298,6 @@ with tab2:
     with m3:
         st.markdown(f'<div class="metric-card-loss"><div class="metric-title">期望负率 (EXP LOSS)</div><div class="metric-value-loss">{mc_loss_pct:.1f}%</div></div>', unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown(f"##### 📊 **95% 胜率置信区间 (Confidence Interval)**: `{ci_lower:.1f}%` ~ `{ci_upper:.1f}%`")
-
     col_sim_chart, col_ab = st.columns([1.1, 0.9])
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -335,17 +332,40 @@ with tab2:
             else:
                 st.info("⚖️ 变阵收益不明显，建议优先调整战术细节而非阵型。")
 
-    with col_contingency:
-        st.subheader("🚨 What-If 突发危机锦囊")
+  with col_contingency:
+        st.subheader("🚨 What-If 突发危机动态锦囊")
         with st.container(border=True):
-            st.markdown("##### 模拟赛场突发极端劣势，系统给出的止损方案：")
-            # 这里调用底层的逻辑，直接给结论，不给复杂的推演过程
-            st.warning("**突发 1：若我方被罚下一人 (控球率暴跌 15%)**")
-            st.caption("➡️ **AI对策**：立即回撤防线，改打 5-4-1，放弃中场逼抢 (容忍 PPDA 上升至 20+)，靠反击抓胜算。")
+            st.markdown("##### 模拟赛场突发极端劣势，AI 实时推演抗风险能力：")
             
-            st.error("**突发 2：若对方中锋完全压制我方中卫 (争顶狂败)**")
-            st.caption(f"➡️ **AI对策**：必须通过换人或阵型收缩，切断其两翼起球路线。若维持当前 {home_formation} 阵型，预测胜率将跌破 {max(0, mc_win_pct - 12.5):.1f}%。")
+            # --------------------------------------------------
+            # 动态计算突发 1：红牌（控球率暴降 15%，PPDA 恶化加 5）
+            # --------------------------------------------------
+            red_card_vector = input_vector.copy()
+            red_card_vector[0][1] = max(20.0, red_card_vector[0][1] - 15.0) # 控球率猛降
+            red_card_vector[0][3] = min(30.0, red_card_vector[0][3] + 5.0)  # 逼抢强度变弱
+            
+            # 用带有噪音的蒙特卡洛再跑一次红牌情境
+            rc_sim_inputs = np.clip(red_card_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
+            rc_win_pct = np.mean(model.predict_proba(rc_sim_inputs)[:, win_idx]) * 100
+            rc_diff = rc_win_pct - mc_win_pct # 计算胜率暴跌了多少
 
+            st.warning(f"**突发 1：若我方被罚下一人 (控球率骤降 15%)**")
+            st.caption(f"➡️ **推演结果**：当前 **{home_formation}** 阵型下，预期胜率将暴跌至 **{rc_win_pct:.1f}%** (亏损 `{rc_diff:.1f}%`)。建议立即回撤防线改打 5-4-1 止损。")
+            
+            st.divider()
+
+            # --------------------------------------------------
+            # 动态计算突发 2：被高空轰炸（争顶胜率暴跌 20%）
+            # --------------------------------------------------
+            aerial_fail_vector = input_vector.copy()
+            aerial_fail_vector[0][6] = max(0.0, aerial_fail_vector[0][6] - 20.0) # 争顶率猛降
+            
+            af_sim_inputs = np.clip(aerial_fail_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
+            af_win_pct = np.mean(model.predict_proba(af_sim_inputs)[:, win_idx]) * 100
+            af_diff = af_win_pct - mc_win_pct
+
+            st.error(f"**突发 2：若对方中锋完全压制我方防线 (争顶狂败 20%)**")
+            st.caption(f"➡️ **推演结果**：预期胜率将滑落至 **{af_win_pct:.1f}%** (亏损 `{af_diff:.1f}%`)。必须通过换人或阵型收缩，切断其两翼起球路线。")
 # =========================================================
 # TAB 3: 简报与 XAI 折叠面板
 # =========================================================
