@@ -332,7 +332,7 @@ with tab2:
             else:
                 st.info("⚖️ 变阵收益不明显，建议优先调整战术细节而非阵型。")
 
-  with col_contingency:
+    with col_contingency:
         st.subheader("🚨 What-If 突发危机动态锦囊")
         with st.container(border=True):
             st.markdown("##### 模拟赛场突发极端劣势，AI 实时推演抗风险能力：")
