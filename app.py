@@ -263,109 +263,72 @@ input_vector = np.array([[
 # =========================================================
 # TAB 2: 7 维蒙特卡洛引擎
 # =========================================================
+# =========================================================
+# TAB 2: 赛前 A/B 变阵决策矩阵 (Manager Decision Board)
+# =========================================================
 with tab2:
-    st.subheader("🎲 蒙特卡洛 1,000 场平行宇宙模拟 & 变阵诊判")
+    st.subheader("⚖️ 战术底盘：A/B 变阵红利与 KPI 代价测算")
+    st.caption("放弃花哨图表，直击核心利益。对比备选阵型对胜率及球队底层运转指标的真实影响。")
 
-    a_min_bounds = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
-    a_max_bounds = np.array([10.0, 100.0, 30.0, 50.0, 60.0, 50.0, 100.0])
-
-    N_SIM = 1000
-    np.random.seed(42)
-    noise = np.random.normal(0, 1, (N_SIM, 7))
-    scale = np.array([0.15, 2.5, 0.8, 0.8, 1.2, 1.0, 2.0])
-    
-    sim_inputs = np.clip(input_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
-    sim_probs = model.predict_proba(sim_inputs)
-
-    classes = list(model.classes_)
-    win_idx = classes.index('Win') if 'Win' in classes else 2
-    draw_idx = classes.index('Draw') if 'Draw' in classes else 0
-    loss_idx = classes.index('Loss') if 'Loss' in classes else 1
-
-    mc_win_pct = np.mean(sim_probs[:, win_idx]) * 100
-    mc_draw_pct = np.mean(sim_probs[:, draw_idx]) * 100
-    mc_loss_pct = np.mean(sim_probs[:, loss_idx]) * 100
-
-    win_probs_series = sim_probs[:, win_idx]
-    ci_lower = np.percentile(win_probs_series, 2.5) * 100
-    ci_upper = np.percentile(win_probs_series, 97.5) * 100
-
+    # 1. 顶部：保留核心的期望胜负平数据 (A计划基石)
     m1, m2, m3 = st.columns(3)
     with m1:
-        st.markdown(f'<div class="metric-card-win"><div class="metric-title">期望胜率 (EXP WIN)</div><div class="metric-value-win">{mc_win_pct:.1f}%</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card-win"><div class="metric-title">方案A ({home_formation}) 期望胜率</div><div class="metric-value-win">{mc_win_pct:.1f}%</div></div>', unsafe_allow_html=True)
     with m2:
-        st.markdown(f'<div class="metric-card-draw"><div class="metric-title">期望平局 (EXP DRAW)</div><div class="metric-value-draw">{mc_draw_pct:.1f}%</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card-draw"><div class="metric-title">期望平局</div><div class="metric-value-draw">{mc_draw_pct:.1f}%</div></div>', unsafe_allow_html=True)
     with m3:
-        st.markdown(f'<div class="metric-card-loss"><div class="metric-title">期望负率 (EXP LOSS)</div><div class="metric-value-loss">{mc_loss_pct:.1f}%</div></div>', unsafe_allow_html=True)
-
-    col_sim_chart, col_ab = st.columns([1.1, 0.9])
+        st.markdown(f'<div class="metric-card-loss"><div class="metric-title">期望负率</div><div class="metric-value-loss">{mc_loss_pct:.1f}%</div></div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown(f"##### 📊 **赛前胜率基盘 (95% Confidence)**: `{ci_lower:.1f}%` ~ `{ci_upper:.1f}%`")
     st.divider()
 
-    # 左右分栏：左边做A/B换阵，右边做突发情景预案
-    col_ab, col_contingency = st.columns([1, 1])
-
-    with col_ab:
-        st.subheader("⚖️ B计划：变阵红利测算")
-        with st.container(border=True):
+    # 2. 核心区：单栏宽幅设计的 B 计划对比矩阵
+    with st.container(border=True):
+        st.markdown("#### 🔄 启动备选方案 (Plan B)")
+        
+        col_select, col_advice = st.columns([1, 1.5])
+        with col_select:
             alt_formation = st.selectbox(
-                "若开局不利，改打备选阵型 (Plan B)",
+                "若需变阵，请选择 B 计划落位：",
                 [f for f in formation_list if f != home_formation]
             )
 
-            alt_mapped = apply_formation_clash_engine(team_baseline, opp_baseline, alt_formation, opp_formation, scenario)
-            alt_vector = np.array([[alt_mapped[f] for f in tactical_features]])
-            alt_sim_inputs = np.clip(alt_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
-            
-            alt_sim_probs = model.predict_proba(alt_sim_inputs)
-            alt_win_pct = np.mean(alt_sim_probs[:, win_idx]) * 100
-            diff = alt_win_pct - mc_win_pct
+        # 重新解算 B 计划的数据
+        alt_mapped = apply_formation_clash_engine(team_baseline, opp_baseline, alt_formation, opp_formation, scenario)
+        alt_vector = np.array([[alt_mapped[f] for f in tactical_features]])
+        alt_sim_inputs = np.clip(alt_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
+        
+        alt_sim_probs = model.predict_proba(alt_sim_inputs)
+        alt_win_pct = np.mean(alt_sim_probs[:, win_idx]) * 100
+        diff_win = alt_win_pct - mc_win_pct
 
-            st.metric(f"变阵 {alt_formation} 后预期胜率", f"{alt_win_pct:.1f}%", f"{diff:+.1f}%")
-
-            if diff > 3.0:
-                st.success(f"💡 **强烈建议**：此变阵存在战术克制红利，建议作为首选 B 计划！")
-            elif diff < -2.0:
-                st.error("⚠️ **高危操作**：此阵型被对手严重克制，严禁盲目切换。")
+        with col_advice:
+            if diff_win > 3.0:
+                st.success(f"💡 **教练组建议**：改打 **{alt_formation}** 预期胜率将暴涨 **+{diff_win:.1f}%**！存在极佳战术克制红利，强烈推荐作为首选方案。")
+            elif diff_win < -2.0:
+                st.error(f"⚠️ **高危警告**：改打 **{alt_formation}** 预期胜率将跌至 **{alt_win_pct:.1f}%**。此阵型被对手严重限制，严禁盲目尝试。")
             else:
-                st.info("⚖️ 变阵收益不明显，建议优先调整战术细节而非阵型。")
+                st.info(f"⚖️ **战术评估**：改打 **{alt_formation}** 胜率变化为 **{diff_win:+.1f}%**。收益不明显，建议维持方案 A 或在临场通过换人微调。")
 
-    with col_contingency:
-        st.subheader("🚨 What-If 突发危机动态锦囊")
-        with st.container(border=True):
-            st.markdown("##### 模拟赛场突发极端劣势，AI 实时推演抗风险能力：")
-            
-            # --------------------------------------------------
-            # 动态计算突发 1：红牌（控球率暴降 15%，PPDA 恶化加 5）
-            # --------------------------------------------------
-            red_card_vector = input_vector.copy()
-            red_card_vector[0][1] = max(20.0, red_card_vector[0][1] - 15.0) # 控球率猛降
-            red_card_vector[0][3] = min(30.0, red_card_vector[0][3] + 5.0)  # 逼抢强度变弱
-            
-            # 用带有噪音的蒙特卡洛再跑一次红牌情境
-            rc_sim_inputs = np.clip(red_card_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
-            rc_win_pct = np.mean(model.predict_proba(rc_sim_inputs)[:, win_idx]) * 100
-            rc_diff = rc_win_pct - mc_win_pct # 计算胜率暴跌了多少
-
-            st.warning(f"**突发 1：若我方被罚下一人 (控球率骤降 15%)**")
-            st.caption(f"➡️ **推演结果**：当前 **{home_formation}** 阵型下，预期胜率将暴跌至 **{rc_win_pct:.1f}%** (亏损 `{rc_diff:.1f}%`)。建议立即回撤防线改打 5-4-1 止损。")
-            
-            st.divider()
-
-            # --------------------------------------------------
-            # 动态计算突发 2：被高空轰炸（争顶胜率暴跌 20%）
-            # --------------------------------------------------
-            aerial_fail_vector = input_vector.copy()
-            aerial_fail_vector[0][6] = max(0.0, aerial_fail_vector[0][6] - 20.0) # 争顶率猛降
-            
-            af_sim_inputs = np.clip(aerial_fail_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
-            af_win_pct = np.mean(model.predict_proba(af_sim_inputs)[:, win_idx]) * 100
-            af_diff = af_win_pct - mc_win_pct
-
-            st.error(f"**突发 2：若对方中锋完全压制我方防线 (争顶狂败 20%)**")
-            st.caption(f"➡️ **推演结果**：预期胜率将滑落至 **{af_win_pct:.1f}%** (亏损 `{af_diff:.1f}%`)。必须通过换人或阵型收缩，切断其两翼起球路线。")
+        st.markdown("##### 📊 变阵付出的战术代价与收益 (KPI Delta)")
+        st.caption("与方案 A 相比，变阵为 B 计划后，球队在场上需要承担的结构性变化：")
+        
+        # 3. 极简红绿数字差值面板
+        k1, k2, k3, k4 = st.columns(4)
+        
+        # 计算差值
+        diff_xg = alt_mapped['xg'] - mapped_stats['xg']
+        diff_poss = alt_mapped['possession'] - mapped_stats['possession']
+        diff_ppda = alt_mapped['ppda'] - mapped_stats['ppda']
+        diff_tackles = alt_mapped['tackles_successful'] - mapped_stats['tackles_successful']
+        
+        # 使用 st.metric 原生组件展示差值 (极度清晰)
+        k1.metric(label="进攻火力 (预期进球 xG)", value=f"{alt_mapped['xg']:.2f}", delta=f"{diff_xg:+.2f}")
+        k2.metric(label="球权控制 (控球率 %)", value=f"{alt_mapped['possession']:.1f}%", delta=f"{diff_poss:+.1f}%")
+        
+        # 特殊处理 PPDA：PPDA 数值越低代表逼抢越凶，所以下降是好事（inverse=True）
+        k3.metric(label="前场压迫 (PPDA)", value=f"{alt_mapped['ppda']:.1f}", delta=f"{diff_ppda:+.1f}", delta_color="inverse")
+        k4.metric(label="防守硬度 (成功抢断)", value=f"{alt_mapped['tackles_successful']:.1f}", delta=f"{diff_tackles:+.1f}")
 # =========================================================
 # TAB 3: 简报与 XAI 折叠面板
 # =========================================================
