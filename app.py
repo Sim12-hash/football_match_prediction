@@ -261,17 +261,11 @@ input_vector = np.array([[
 ]])
 
 # =========================================================
-# TAB 2: 7 维蒙特卡洛引擎
-# =========================================================
-# =========================================================
-# TAB 2: 赛前 A/B 变阵决策矩阵 (Manager Decision Board)
-# =========================================================
-# =========================================================
 # TAB 2: 赛前 A/B 变阵决策矩阵 (Manager Decision Board)
 # =========================================================
 with tab2:
     # ---------------------------------------------------------
-    # 1. 核心计算引擎：蒙特卡洛 1000 次模拟 (不要删除这部分)
+    # 1. 核心计算引擎：蒙特卡洛 1000 次模拟 
     # ---------------------------------------------------------
     a_min_bounds = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
     a_max_bounds = np.array([10.0, 100.0, 30.0, 50.0, 60.0, 50.0, 100.0])
@@ -292,6 +286,11 @@ with tab2:
     mc_win_pct = np.mean(sim_probs[:, win_idx]) * 100
     mc_draw_pct = np.mean(sim_probs[:, draw_idx]) * 100
     mc_loss_pct = np.mean(sim_probs[:, loss_idx]) * 100
+
+    # 👇 就是这两行，绝对不能少！ 👇
+    win_probs_series = sim_probs[:, win_idx]
+    ci_lower = np.percentile(win_probs_series, 2.5) * 100
+    ci_upper = np.percentile(win_probs_series, 97.5) * 100
 
     # ---------------------------------------------------------
     # 2. 极简前端 UI 渲染
@@ -351,12 +350,13 @@ with tab2:
         k2.metric(label="球权控制 (控球率 %)", value=f"{alt_mapped['possession']:.1f}%", delta=f"{diff_poss:+.1f}%")
         k3.metric(label="前场压迫 (PPDA)", value=f"{alt_mapped['ppda']:.1f}", delta=f"{diff_ppda:+.1f}", delta_color="inverse")
         k4.metric(label="防守硬度 (成功抢断)", value=f"{alt_mapped['tackles_successful']:.1f}", delta=f"{diff_tackles:+.1f}")
+
 # =========================================================
 # TAB 3: 简报与 XAI 折叠面板
 # =========================================================
 with tab3:
     st.subheader("📑 赛前主帅执行简报 (Executive Brief)")
-    st.caption("提炼 7 大黄金指标中的核心优势与劣势，供教练组直接布置针对性战术。")
+    st.caption("提炼核心优势与劣势，供教练组直接下达任务。")
 
     rf_importances = model.feature_importances_
     current_vals = input_vector[0]
@@ -389,7 +389,7 @@ with tab3:
             st.markdown("##### ✅ 我方黄金优势点")
             if top_positives:
                 for feat, val, score in top_positives:
-                    st.success(f"**{feat.upper()}** (当前盘面: `{val:.1f}`)")
+                    st.success(f"**{feat.upper()}** (指标: `{val:.1f}`)")
             else:
                 st.caption("暂无明显数据优势，需临场调度。")
 
@@ -397,37 +397,27 @@ with tab3:
             st.markdown("##### ⚠️ 重点防范劣势")
             if top_negatives:
                 for feat, val, score in top_negatives:
-                    st.warning(f"**{feat.upper()}** (当前盘面: `{val:.1f}`)")
+                    st.warning(f"**{feat.upper()}** (指标: `{val:.1f}`)")
             else:
                 st.caption("当前战术运转严密，风险受控。")
 
         st.divider()
-        report_text = f"# ⚽ 赛前战术简报: {home_team} vs {away_team}\n- 我方阵型: {home_formation}\n- 敌方阵型: {opp_formation}\n- 期望胜率: {mc_win_pct:.1f}%\n- 95% 置信区间: {ci_lower:.1f}% ~ {ci_upper:.1f}%\n\n---\n## ✅ 优势破局点:\n"
-        report_text += "\n".join([f"- {f.upper()}: {v:.1f}" for f, v, s in top_positives]) + "\n\n"
-        report_text += "## ⚠️ 严防劣势:\n"
-        report_text += "\n".join([f"- {f.upper()}: {v:.1f}" for f, v, s in top_negatives])
+        
+        # 极简版更衣室战术简报生成
+        report_text = f"""# ⚽ 赛前战术执行单: {home_team} vs {away_team}
+- **首发阵型**: {home_formation}
+- **基础盘面预期**: 胜率 {mc_win_pct:.1f}%
+
+---
+### ⚔️ 进攻端破局指令:
+"""
+        report_text += "\n".join([f"- 重点利用 **{f.upper()}** (指标要求: {v:.1f})" for f, v, s in top_positives]) + "\n\n"
+        report_text += "### 🛡️ 防守端避险指令:\n"
+        report_text += "\n".join([f"- 绝对警惕 **{f.upper()}** 的崩盘 (底线指标: {v:.1f})" for f, v, s in top_negatives])
 
         st.download_button(
-            label="📥 导出 PDF/Markdown 战术简报 (供更衣室使用)",
+            label="📥 导出 Markdown 战术执行单 (交由队长传达)",
             data=report_text,
-            file_name=f"Executive_Brief_{home_team}_vs_{away_team}.md",
+            file_name=f"Tactical_Sheet_{home_team}_vs_{away_team}.md",
             mime="text/markdown"
         )
-
-    with st.expander("⚙️ 查看 AI 底层归因推演逻辑 (数据分析师视角)"):
-        st.markdown("该图表展示了随机森林模型计算胜负概率时，7 大黄金战术因子发挥的**杠杆影响力**。")
-        
-        xai_df = pd.DataFrame({
-            'Feature': [x[0] for x in contributions],
-            'Contribution': [x[2] for x in contributions]
-        }).sort_values(by='Contribution')
-
-        fig_xai, ax_xai = plt.subplots(figsize=(8, 3.5), facecolor='#0b0f19')
-        ax_xai.set_facecolor('#1e293b')
-        colors = ['#00FF87' if v >= 0 else '#FF0055' for v in xai_df['Contribution']]
-        
-        bars = ax_xai.barh(xai_df['Feature'], xai_df['Contribution'], color=colors, edgecolor='black', linewidth=1)
-        ax_xai.set_title("7 Golden Drivers Impacting This Match", color='white', fontsize=10, fontweight='bold')
-        ax_xai.tick_params(colors='white')
-        plt.tight_layout()
-        st.pyplot(fig_xai)
