@@ -218,42 +218,49 @@ tab1, tab2, tab3 = st.tabs([
 # =========================================================
 # TAB 1: 2D 足球场 + 战术指令下达
 # =========================================================
+# =========================================================
+# TAB 1: 2D 足球场 + 战术指令下达
+# =========================================================
 with tab1:
+    # ⚠️ 修复点：先把战术选项放出来，把参数算好，再去渲染 UI！
+    st.subheader("📋 主帅赛前战术定调 (Manager Directives)")
+    tactical_style = st.radio(
+        "本场比赛核心战术倾向",
+        [
+            "⚖️ 常规平衡 (按原定阵型运转)", 
+            "🔥 疯狗式压迫 (Gegenpressing - 极致体能消耗)", 
+            "🛡️ 铁桶阵防反 (Low Block & Counter - 放弃球权)", 
+            "⚔️ 两翼齐飞轰炸 (Wide & Aerial - 主打边路传中)"
+        ],
+        index=0,
+        horizontal=True # 横向排版更省空间
+    )
+    
+    # 后台立即应用战术修饰得到最终 A 计划数据
+    adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
+
+    st.divider()
+
+    # 然后再分左右栏渲染画面，确保所有图表都使用最新的 adj_stats
     col_pitch, col_panel = st.columns([1.2, 1.0])
 
     with col_pitch:
-        st.subheader("🏟️ 阵型对弈与防线落位图层")
+        st.markdown("##### 🏟️ 阵型对弈与防线落位图层")
         fig_pitch = draw_2d_pitch_enhanced(home_formation, home_team)
         st.pyplot(fig_pitch)
 
-        st.markdown("##### 📈 阵型博弈对球队 KPI 的预期影响")
+        st.markdown("##### 📈 战术执行对球队 KPI 的动态影响")
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("预期进球 xG", f"{mapped_stats_base['xg']:.2f}", f"{mapped_stats_base['xg'] - team_baseline['xg']:+.2f}")
-        k2.metric("控球率 Possession", f"{mapped_stats_base['possession']:.1f}%", f"{mapped_stats_base['possession'] - team_baseline['possession']:+.1f}%")
-        k3.metric("逼抢强度 PPDA", f"{mapped_stats_base['ppda']:.1f}", f"{mapped_stats_base['ppda'] - team_baseline['ppda']:+.1f}", delta_color="inverse")
-        k4.metric("成功抢断 Tackles", f"{mapped_stats_base['tackles_successful']:.1f}", f"{mapped_stats_base['tackles_successful'] - team_baseline['tackles_successful']:+.1f}")
+        # ⚠️ 修复点：这里全部改用 adj_stats，数字就会跟着战术动了！
+        k1.metric("预期进球 xG", f"{adj_stats['xg']:.2f}", f"{adj_stats['xg'] - team_baseline['xg']:+.2f}")
+        k2.metric("控球率 Possession", f"{adj_stats['possession']:.1f}%", f"{adj_stats['possession'] - team_baseline['possession']:+.1f}%")
+        k3.metric("逼抢强度 PPDA", f"{adj_stats['ppda']:.1f}", f"{adj_stats['ppda'] - team_baseline['ppda']:+.1f}", delta_color="inverse")
+        k4.metric("成功抢断 Tackles", f"{adj_stats['tackles_successful']:.1f}", f"{adj_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}")
 
     with col_panel:
-        st.subheader("📋 主帅赛前战术定调 (Manager Directives)")
-        st.caption("选择本场核心战略，AI将自动解算为球员的量化执行 KPI。")
-
-        tactical_style = st.radio(
-            "本场比赛核心战术倾向",
-            [
-                "⚖️ 常规平衡 (按原定阵型运转)", 
-                "🔥 疯狗式压迫 (Gegenpressing - 极致体能消耗)", 
-                "🛡️ 铁桶阵防反 (Low Block & Counter - 放弃球权)", 
-                "⚔️ 两翼齐飞轰炸 (Wide & Aerial - 主打边路传中)"
-            ],
-            index=0
-        )
-
-        # 应用战术修饰得到最终 A 计划数据
-        adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
-
         st.markdown("#### 🎯 球员执行 KPI 目标 (可直接下达更衣室)")
         with st.container(border=True):
-            st.success(f"**中前场任务**: 必须将对手的逼抢压迫度 (PPDA) 限制在 **{adj_stats['ppda']:.1f}** 以内。")
+            st.success(f"**中前场任务**: 将对手的逼抢压迫度 (PPDA) 限制在 **{adj_stats['ppda']:.1f}** 以内。")
             st.info(f"**后防线任务**: 全场需保持高度专注，完成至少 **{int(adj_stats['interceptions'])}** 次拦截。")
             st.warning(f"**整体节奏**: 预期控球率将维持在 **{adj_stats['possession']:.1f}%** 左右，射正需达到 **{int(adj_stats['shots_on_target'])}** 次。")
             st.error(f"**对抗要求**: 争顶胜率必须咬住 **{adj_stats['aerial_duels_won_pct']:.1f}%** 的底线。")
@@ -348,23 +355,49 @@ with tab2:
         k4.metric("成功抢断", f"{alt_mapped_styled['tackles_successful']:.1f}", f"{diff_tackles:+.1f}")
 
 # =========================================================
-# TAB 3: 带有实战指令翻译的教练简报
+# TAB 3: 数据驱动的动态叙事引擎 (Data-Driven Narrative Engine)
 # =========================================================
 with tab3:
     st.subheader("📑 赛前主帅执行单 (Executive Brief)")
-    st.caption("AI提炼核心优劣势，并翻译为可直接向球员下达的战术指令。")
+    st.caption("基于随机森林权重与实时数值偏差，动态生成的个性化战术对抗报告。")
 
-    # 战术指令字典：将冷冰冰的数据指标翻译成球员听得懂的“人话”
-    TACTICAL_ADVICE = {
-        'xg': "创造空当打透防线，提高禁区内射门转化率。",
-        'possession': "稳住球权节奏，通过快速传导消耗对手体能。",
-        'shots_on_target': "加强禁区前沿的远射尝试与门前二次抢点。",
-        'ppda': "全军压上！丢球后必须在3秒内就地合围反抢。",
-        'tackles_successful': "提升中场绞杀硬度，遇险果断下脚破坏。",
-        'interceptions': "保持防线紧凑，提前预判并切断对手核心传球路线。",
-        'aerial_duels_won_pct': "控制第一落点！边路起球果断找高中锋头顶。"
-    }
+    # 🚀 核心升级：废除硬编码静态文本，采用“数值插值与偏差感知”的动态引擎
+    def get_dynamic_advice(feat, curr_val, base_val, is_advantage, style):
+        diff = curr_val - base_val
+        abs_diff = abs(diff)
+        direction = "高出" if diff > 0 else "低于"
+        
+        # 针对不同特征，结合真实数值与战术风格动态拼装“专属于本场比赛”的描述
+        if feat == 'ppda':
+            # PPDA 越低压迫越凶
+            press_intensity = "极具侵略性（高位绞杀）" if curr_val < 11 else "趋于稳健保守（低位退防）"
+            return f"当前 PPDA 测算为 {curr_val:.1f}（较赛事基准 {base_val:.1f} {direction} {abs_diff:.1f} 维）。结合当前【{style.split(' ')[1]}】打法，整体防线压迫呈现**{press_intensity}**态势，需警惕身后空间被利用。"
+            
+        elif feat == 'possession':
+            control_type = "绝对球权掌控" if curr_val > 50 else "主动让渡球权、主打防反"
+            return f"预期控球率锁定在 {curr_val:.1f}%（基准均值 {base_val:.1f}%，波动 {diff:+.1f}%）。战术反馈为**{control_type}**，中场球员需严格把控传导失误率。"
+            
+        elif feat == 'xg':
+            threat_level = "极高，具备持续破门能力" if curr_val > 1.3 else "偏弱，需精简进攻配合"
+            return f"预期进球 (xG) 评估为 {curr_val:.2f}（历史基准 {base_val:.2f}，变动 {diff:+.2f}）。进攻终结威胁**{threat_level}**，直接锚定禁区内的战术转化率。"
+            
+        elif feat == 'shots_on_target':
+            return f"预期射正次数为 {int(curr_val)} 次（均值参考 {base_val:.1f}）。多维进攻打击力度{'充沛' if curr_val >= base_val else '有所欠缺'}，要求中前场必须增加远射与门前二次包抄。"
+            
+        elif feat == 'tackles_successful':
+            return f"成功抢断预估 {int(curr_val)} 次（基准 {base_val:.1f}）。中场绞杀硬度{'达标' if curr_val >= base_val else '存在隐患'}，直接决定对对手核心出球点的限制效果。"
+            
+        elif feat == 'interceptions':
+            return f"拦截次数预计达 {int(curr_val)} 次（基准 {base_val:.1f}）。防线预判与延误能力{'优秀' if curr_val >= base_val else '偏弱'}，需重点切断对手的直塞球线路。"
+            
+        elif feat == 'aerial_duels_won_pct':
+            air_status = "制空权优势明显" if curr_val >= 50 else "高空争夺处于劣势"
+            return f"争顶胜率预期为 {curr_val:.1f}%（基准 {base_val:.1f}%）。高空球控制力评估：**{air_status}**，直接左右定位球及边路传中的防守质量。"
+            
+        # 兜底动态生成
+        return f"指标数值为 {curr_val:.1f}（历史基准 {base_val:.1f}，偏离度 {diff:+.1f}），需在实战中重点针对性部署。"
 
+    # --- 以下是生成报告的逻辑重构 ---
     rf_importances = model.feature_importances_
     current_vals = input_vector[0]
 
@@ -374,11 +407,7 @@ with tab3:
         curr_val = current_vals[i]
         imp = rf_importances[i]
 
-        if feat == 'ppda':
-            diff = base_val - curr_val
-        else:
-            diff = curr_val - base_val
-
+        diff = (base_val - curr_val) if feat == 'ppda' else (curr_val - base_val)
         score = diff * imp
         contributions.append((feat, curr_val, score))
 
@@ -396,8 +425,10 @@ with tab3:
             st.markdown("##### ✅ 战术红利点 (主攻方向)")
             if top_positives:
                 for feat, val, score in top_positives:
-                    advice = TACTICAL_ADVICE.get(feat, "")
-                    st.success(f"**{feat.upper()}** (预估: `{val:.1f}`)\n\n*指令：{advice}*")
+                    # 💡 传入实时计算出来的 curr_val 和 base_val 进行动态插值
+                    base_val = FEATURE_BASELINES[feat]
+                    advice = get_dynamic_advice(feat, val, base_val, True, tactical_style)
+                    st.success(f"**{feat.upper()}** (指标: `{val:.1f}`)\n\n*动态解析：{advice}*")
             else:
                 st.caption("暂无明显数据优势。")
 
@@ -405,13 +436,16 @@ with tab3:
             st.markdown("##### ⚠️ 致命阿喀琉斯之踵 (严防死守)")
             if top_negatives:
                 for feat, val, score in top_negatives:
-                    advice = TACTICAL_ADVICE.get(feat, "")
-                    st.error(f"**{feat.upper()}** (预估: `{val:.1f}`)\n\n*警告：此环节易崩盘，需针对性保护协防！*")
+                    # 💡 传入实时计算出来的 curr_val 和 base_val 进行动态插值
+                    base_val = FEATURE_BASELINES[feat]
+                    advice = get_dynamic_advice(feat, val, base_val, False, tactical_style)
+                    st.error(f"**{feat.upper()}** (指标: `{val:.1f}`)\n\n*动态警告：{advice}*")
             else:
                 st.caption("风险受控。")
 
         st.divider()
         
+        # Markdown 战术执行单同步升级为数值驱动
         report_text = f"""# ⚽ 赛前战术执行单: {home_team} vs {away_team}
 - **首发阵型**: {home_formation} ({tactical_style.split(' ')[1]})
 - **预期胜率**: {mc_win_pct:.1f}% (置信区间 {ci_lower:.1f}% ~ {ci_upper:.1f}%)
@@ -419,9 +453,9 @@ with tab3:
 ---
 ### ⚔️ 进攻端主攻指令:
 """
-        report_text += "\n".join([f"- 发挥 **{f.upper()}** 优势。要求：{TACTICAL_ADVICE.get(f, '')}" for f, v, s in top_positives]) + "\n\n"
+        report_text += "\n".join([f"- 发挥 **{f.upper()}** 优势（当前值 {v:.1f}）。执行方案：{get_dynamic_advice(f, v, FEATURE_BASELINES[f], True, tactical_style)}" for f, v, s in top_positives]) + "\n\n"
         report_text += "### 🛡️ 防守端避险指令:\n"
-        report_text += "\n".join([f"- 警惕 **{f.upper()}** 被打穿！要求：加强协防，掩盖此项短板。" for f, v, s in top_negatives])
+        report_text += "\n".join([f"- 警惕 **{f.upper()}** 崩盘风险（当前值 {v:.1f}）。应对方案：{get_dynamic_advice(f, v, FEATURE_BASELINES[f], False, tactical_style)}" for f, v, s in top_negatives])
 
         st.download_button(
             label="📥 导出 Markdown 战术执行单 (交由队长传达)",
@@ -429,4 +463,3 @@ with tab3:
             file_name=f"Tactical_Sheet_{home_team}_vs_{away_team}.md",
             mime="text/markdown"
         )
-        
