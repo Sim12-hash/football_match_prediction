@@ -132,7 +132,7 @@ st.sidebar.header("🎯 3. 比赛情景干预 (Scenarios)")
 scenario = st.sidebar.radio("比赛所处情景", ["常规开局 (0-0 Balanced)", "落后狂攻 (Press All Out)", "领先后缩 (Parking Bus)"], index=0)
 
 # ---------------------------------------------------------
-# 5. 7 黄金维度阵型对弈引擎
+# 5. 7 黄金维度阵型对弈引擎 & 战术风格修饰器
 # ---------------------------------------------------------
 def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
     mapped = home_base.copy()
@@ -186,19 +186,37 @@ def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
 
     return mapped
 
-mapped_stats = apply_formation_clash_engine(team_baseline, opp_baseline, home_formation, opp_formation, scenario)
+# 核心解耦：独立的战术风格修饰函数
+def apply_tactical_style(stats_dict, style):
+    adj = stats_dict.copy()
+    if "疯狗式" in style:
+        adj['ppda'] *= 0.65  
+        adj['tackles_successful'] *= 1.25
+        adj['possession'] *= 1.1
+    elif "铁桶阵" in style:
+        adj['possession'] *= 0.65
+        adj['ppda'] *= 1.5
+        adj['interceptions'] *= 1.3
+        adj['xg'] *= 0.8
+    elif "两翼齐飞" in style:
+        adj['aerial_duels_won_pct'] = min(80.0, adj['aerial_duels_won_pct'] * 1.25)
+        adj['shots_on_target'] *= 1.1
+    return adj
+
+# 先算出底层的阵型对冲数据
+mapped_stats_base = apply_formation_clash_engine(team_baseline, opp_baseline, home_formation, opp_formation, scenario)
 
 # ---------------------------------------------------------
 # 6. Tab 选项卡主界面排版
 # ---------------------------------------------------------
 tab1, tab2, tab3 = st.tabs([
     "🏟️ 1. 战术沙盘微调 (Tactical Board)",
-    "🎲 2. 蒙特卡洛胜率诊断 (Monte Carlo Engine)",
+    "⚖️ 2. A/B 变阵决策矩阵 (Manager Board)",
     "📑 3. 教练战术简报 (Executive Brief)"
 ])
 
 # =========================================================
-# TAB 1: 2D 足球场 + 7 维动态面板
+# TAB 1: 2D 足球场 + 战术指令下达
 # =========================================================
 with tab1:
     col_pitch, col_panel = st.columns([1.2, 1.0])
@@ -210,16 +228,15 @@ with tab1:
 
         st.markdown("##### 📈 阵型博弈对球队 KPI 的预期影响")
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("预期进球 xG", f"{mapped_stats['xg']:.2f}", f"{mapped_stats['xg'] - team_baseline['xg']:+.2f}")
-        k2.metric("控球率 Possession", f"{mapped_stats['possession']:.1f}%", f"{mapped_stats['possession'] - team_baseline['possession']:+.1f}%")
-        k3.metric("逼抢强度 PPDA", f"{mapped_stats['ppda']:.1f}", f"{mapped_stats['ppda'] - team_baseline['ppda']:+.1f}")
-        k4.metric("成功抢断 Tackles", f"{mapped_stats['tackles_successful']:.1f}", f"{mapped_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}")
+        k1.metric("预期进球 xG", f"{mapped_stats_base['xg']:.2f}", f"{mapped_stats_base['xg'] - team_baseline['xg']:+.2f}")
+        k2.metric("控球率 Possession", f"{mapped_stats_base['possession']:.1f}%", f"{mapped_stats_base['possession'] - team_baseline['possession']:+.1f}%")
+        k3.metric("逼抢强度 PPDA", f"{mapped_stats_base['ppda']:.1f}", f"{mapped_stats_base['ppda'] - team_baseline['ppda']:+.1f}", delta_color="inverse")
+        k4.metric("成功抢断 Tackles", f"{mapped_stats_base['tackles_successful']:.1f}", f"{mapped_stats_base['tackles_successful'] - team_baseline['tackles_successful']:+.1f}")
 
     with col_panel:
         st.subheader("📋 主帅赛前战术定调 (Manager Directives)")
         st.caption("选择本场核心战略，AI将自动解算为球员的量化执行 KPI。")
 
-        # 将滑块替换为符合教练直觉的战术选项
         tactical_style = st.radio(
             "本场比赛核心战术倾向",
             [
@@ -231,42 +248,26 @@ with tab1:
             index=0
         )
 
-        # 战术指令在后台自动转化为 7 维黄金指标的修饰逻辑
-        adj = mapped_stats.copy()
-        if "疯狗式" in tactical_style:
-            adj['ppda'] *= 0.65  # PPDA越低，逼抢越狠
-            adj['tackles_successful'] *= 1.25
-            adj['possession'] *= 1.1
-        elif "铁桶阵" in tactical_style:
-            adj['possession'] *= 0.65
-            adj['ppda'] *= 1.5
-            adj['interceptions'] *= 1.3
-            adj['xg'] *= 0.8
-        elif "两翼齐飞" in tactical_style:
-            adj['aerial_duels_won_pct'] = min(80.0, adj['aerial_duels_won_pct'] * 1.25)
-            adj['shots_on_target'] *= 1.1
+        # 应用战术修饰得到最终 A 计划数据
+        adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
 
-        # 向教练展示最终下达给球员的 KPI 目标
         st.markdown("#### 🎯 球员执行 KPI 目标 (可直接下达更衣室)")
         with st.container(border=True):
-            st.success(f"**中前场任务**: 必须将对手的逼抢压迫度 (PPDA) 限制在 **{adj['ppda']:.1f}** 以内。")
-            st.info(f"**后防线任务**: 全场需保持高度专注，完成至少 **{int(adj['interceptions'])}** 次拦截。")
-            st.warning(f"**整体节奏**: 预期控球率将维持在 **{adj['possession']:.1f}%** 左右，射正需达到 **{int(adj['shots_on_target'])}** 次。")
-            st.error(f"**对抗要求**: 争顶胜率必须咬住 **{adj['aerial_duels_won_pct']:.1f}%** 的底线。")
+            st.success(f"**中前场任务**: 必须将对手的逼抢压迫度 (PPDA) 限制在 **{adj_stats['ppda']:.1f}** 以内。")
+            st.info(f"**后防线任务**: 全场需保持高度专注，完成至少 **{int(adj_stats['interceptions'])}** 次拦截。")
+            st.warning(f"**整体节奏**: 预期控球率将维持在 **{adj_stats['possession']:.1f}%** 左右，射正需达到 **{int(adj_stats['shots_on_target'])}** 次。")
+            st.error(f"**对抗要求**: 争顶胜率必须咬住 **{adj_stats['aerial_duels_won_pct']:.1f}%** 的底线。")
 
-# 生成最终的 7 维向量喂给 Tab 2 的蒙特卡洛引擎
+# 生成最终的 7 维向量喂给引擎
 input_vector = np.array([[
-    adj['xg'], adj['possession'], adj['shots_on_target'], 
-    adj['ppda'], adj['tackles_successful'], adj['interceptions'], adj['aerial_duels_won_pct']
+    adj_stats['xg'], adj_stats['possession'], adj_stats['shots_on_target'], 
+    adj_stats['ppda'], adj_stats['tackles_successful'], adj_stats['interceptions'], adj_stats['aerial_duels_won_pct']
 ]])
 
 # =========================================================
-# TAB 2: 赛前 A/B 变阵决策矩阵 (Manager Decision Board)
+# TAB 2: 赛前 A/B 变阵决策矩阵
 # =========================================================
 with tab2:
-    # ---------------------------------------------------------
-    # 1. 核心计算引擎：蒙特卡洛 1000 次模拟 
-    # ---------------------------------------------------------
     a_min_bounds = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
     a_max_bounds = np.array([10.0, 100.0, 30.0, 50.0, 60.0, 50.0, 100.0])
 
@@ -287,14 +288,10 @@ with tab2:
     mc_draw_pct = np.mean(sim_probs[:, draw_idx]) * 100
     mc_loss_pct = np.mean(sim_probs[:, loss_idx]) * 100
 
-    # 👇 就是这两行，绝对不能少！ 👇
     win_probs_series = sim_probs[:, win_idx]
     ci_lower = np.percentile(win_probs_series, 2.5) * 100
     ci_upper = np.percentile(win_probs_series, 97.5) * 100
 
-    # ---------------------------------------------------------
-    # 2. 极简前端 UI 渲染
-    # ---------------------------------------------------------
     st.subheader("⚖️ 战术底盘：A/B 变阵红利与 KPI 代价测算")
     st.caption("放弃花哨图表，直击核心利益。对比备选阵型对胜率及球队底层运转指标的真实影响。")
 
@@ -319,9 +316,10 @@ with tab2:
                 [f for f in formation_list if f != home_formation]
             )
 
-        # 重新解算 B 计划的数据
-        alt_mapped = apply_formation_clash_engine(team_baseline, opp_baseline, alt_formation, opp_formation, scenario)
-        alt_vector = np.array([[alt_mapped[f] for f in tactical_features]])
+        # 完美修补逻辑断层：B计划也必须继承战术修饰器！
+        alt_mapped_base = apply_formation_clash_engine(team_baseline, opp_baseline, alt_formation, opp_formation, scenario)
+        alt_mapped_styled = apply_tactical_style(alt_mapped_base, tactical_style)
+        alt_vector = np.array([[alt_mapped_styled[f] for f in tactical_features]])
         alt_sim_inputs = np.clip(alt_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
         
         alt_sim_probs = model.predict_proba(alt_sim_inputs)
@@ -330,33 +328,42 @@ with tab2:
 
         with col_advice:
             if diff_win > 3.0:
-                st.success(f"💡 **教练组建议**：改打 **{alt_formation}** 预期胜率将暴涨 **+{diff_win:.1f}%**！存在极佳战术克制红利，强烈推荐作为首选方案。")
+                st.success(f"💡 **教练组建议**：改打 **{alt_formation}** 预期胜率将暴涨 **+{diff_win:.1f}%**！存在极佳战术克制红利，强烈推荐。")
             elif diff_win < -2.0:
-                st.error(f"⚠️ **高危警告**：改打 **{alt_formation}** 预期胜率将跌至 **{alt_win_pct:.1f}%**。此阵型被对手严重限制，严禁盲目尝试。")
+                st.error(f"⚠️ **高危警告**：改打 **{alt_formation}** 预期胜率将跌至 **{alt_win_pct:.1f}%**。被对手严重限制，严禁盲目尝试。")
             else:
-                st.info(f"⚖️ **战术评估**：改打 **{alt_formation}** 胜率变化为 **{diff_win:+.1f}%**。收益不明显，建议维持方案 A 或在临场通过换人微调。")
+                st.info(f"⚖️ **战术评估**：改打 **{alt_formation}** 胜率变化为 **{diff_win:+.1f}%**。收益不明显，建议优先临场微调。")
 
         st.markdown("##### 📊 变阵付出的战术代价与收益 (KPI Delta)")
-        st.caption("与方案 A 相比，变阵为 B 计划后，球队在场上需要承担的结构性变化：")
         
         k1, k2, k3, k4 = st.columns(4)
+        diff_xg = alt_mapped_styled['xg'] - adj_stats['xg']
+        diff_poss = alt_mapped_styled['possession'] - adj_stats['possession']
+        diff_ppda = alt_mapped_styled['ppda'] - adj_stats['ppda']
+        diff_tackles = alt_mapped_styled['tackles_successful'] - adj_stats['tackles_successful']
         
-        diff_xg = alt_mapped['xg'] - mapped_stats['xg']
-        diff_poss = alt_mapped['possession'] - mapped_stats['possession']
-        diff_ppda = alt_mapped['ppda'] - mapped_stats['ppda']
-        diff_tackles = alt_mapped['tackles_successful'] - mapped_stats['tackles_successful']
-        
-        k1.metric(label="进攻火力 (预期进球 xG)", value=f"{alt_mapped['xg']:.2f}", delta=f"{diff_xg:+.2f}")
-        k2.metric(label="球权控制 (控球率 %)", value=f"{alt_mapped['possession']:.1f}%", delta=f"{diff_poss:+.1f}%")
-        k3.metric(label="前场压迫 (PPDA)", value=f"{alt_mapped['ppda']:.1f}", delta=f"{diff_ppda:+.1f}", delta_color="inverse")
-        k4.metric(label="防守硬度 (成功抢断)", value=f"{alt_mapped['tackles_successful']:.1f}", delta=f"{diff_tackles:+.1f}")
+        k1.metric("预期进球 xG", f"{alt_mapped_styled['xg']:.2f}", f"{diff_xg:+.2f}")
+        k2.metric("控球率 %", f"{alt_mapped_styled['possession']:.1f}%", f"{diff_poss:+.1f}%")
+        k3.metric("前场压迫 PPDA", f"{alt_mapped_styled['ppda']:.1f}", f"{diff_ppda:+.1f}", delta_color="inverse")
+        k4.metric("成功抢断", f"{alt_mapped_styled['tackles_successful']:.1f}", f"{diff_tackles:+.1f}")
 
 # =========================================================
-# TAB 3: 简报与 XAI 折叠面板
+# TAB 3: 带有实战指令翻译的教练简报
 # =========================================================
 with tab3:
-    st.subheader("📑 赛前主帅执行简报 (Executive Brief)")
-    st.caption("提炼核心优势与劣势，供教练组直接下达任务。")
+    st.subheader("📑 赛前主帅执行单 (Executive Brief)")
+    st.caption("AI提炼核心优劣势，并翻译为可直接向球员下达的战术指令。")
+
+    # 战术指令字典：将冷冰冰的数据指标翻译成球员听得懂的“人话”
+    TACTICAL_ADVICE = {
+        'xg': "创造空当打透防线，提高禁区内射门转化率。",
+        'possession': "稳住球权节奏，通过快速传导消耗对手体能。",
+        'shots_on_target': "加强禁区前沿的远射尝试与门前二次抢点。",
+        'ppda': "全军压上！丢球后必须在3秒内就地合围反抢。",
+        'tackles_successful': "提升中场绞杀硬度，遇险果断下脚破坏。",
+        'interceptions': "保持防线紧凑，提前预判并切断对手核心传球路线。",
+        'aerial_duels_won_pct': "控制第一落点！边路起球果断找高中锋头顶。"
+    }
 
     rf_importances = model.feature_importances_
     current_vals = input_vector[0]
@@ -380,43 +387,48 @@ with tab3:
     top_negatives = [c for c in contributions if c[2] < 0][-3:]
 
     with st.container(border=True):
-        st.markdown(f"### 🏟️ 赛前形势: {home_team} vs {away_team}")
-        st.caption(f"**我方阵型**：{home_formation} | **敌方阵型**：{opp_formation} | **当前情景**：{scenario}")
+        st.markdown(f"### 🏟️ 赛前定调: {home_team} vs {away_team}")
+        st.caption(f"**部署阵型**：{home_formation} | **战术打法**：{tactical_style.split(' ')[1]} | **基础胜率**: {mc_win_pct:.1f}%")
         
         col_pos, col_neg = st.columns(2)
         
         with col_pos:
-            st.markdown("##### ✅ 我方黄金优势点")
+            st.markdown("##### ✅ 战术红利点 (主攻方向)")
             if top_positives:
                 for feat, val, score in top_positives:
-                    st.success(f"**{feat.upper()}** (指标: `{val:.1f}`)")
+                    advice = TACTICAL_ADVICE.get(feat, "")
+                    st.success(f"**{feat.upper()}** (预估: `{val:.1f}`)\n\n*指令：{advice}*")
             else:
-                st.caption("暂无明显数据优势，需临场调度。")
+                st.caption("暂无明显数据优势。")
 
         with col_neg:
-            st.markdown("##### ⚠️ 重点防范劣势")
+            st.markdown("##### ⚠️ 致命阿喀琉斯之踵 (严防死守)")
             if top_negatives:
                 for feat, val, score in top_negatives:
-                    st.warning(f"**{feat.upper()}** (指标: `{val:.1f}`)")
+                    advice = TACTICAL_ADVICE.get(feat, "")
+                    st.error(f"**{feat.upper()}** (预估: `{val:.1f}`)\n\n*警告：此环节易崩盘，需针对性保护协防！*")
             else:
-                st.caption("当前战术运转严密，风险受控。")
+                st.caption("风险受控。")
 
         st.divider()
         
-        # 极简版更衣室战术简报生成
         report_text = f"""# ⚽ 赛前战术执行单: {home_team} vs {away_team}
-- **首发阵型**: {home_formation}
-- **基础盘面预期**: 胜率 {mc_win_pct:.1f}%
+- **首发阵型**: {home_formation} ({tactical_style.split(' ')[1]})
+- **预期胜率**: {mc_win_pct:.1f}% (置信区间 {ci_lower:.1f}% ~ {ci_upper:.1f}%)
 
 ---
-### ⚔️ 进攻端破局指令:
+### ⚔️ 进攻端主攻指令:
 """
-        report_text += "\n".join([f"- 重点利用 **{f.upper()}** (指标要求: {v:.1f})" for f, v, s in top_positives]) + "\n\n"
+        report_text += "\n".join([f"- 发挥 **{f.upper()}** 优势。要求：{TACTICAL_ADVICE.get(f, '')}" for f, v, s in top_positives]) + "\n\n"
         report_text += "### 🛡️ 防守端避险指令:\n"
-        report_text += "\n".join([f"- 绝对警惕 **{f.upper()}** 的崩盘 (底线指标: {v:.1f})" for f, v, s in top_negatives])
+        report_text += "\n".join([f"- 警惕 **{f.upper()}** 被打穿！要求：加强协防，掩盖此项短板。" for f, v, s in top_negatives])
 
         st.download_button(
             label="📥 导出 Markdown 战术执行单 (交由队长传达)",
+            data=report_text,
+            file_name=f"Tactical_Sheet_{home_team}_vs_{away_team}.md",
+            mime="text/markdown"
+        )
             data=report_text,
             file_name=f"Tactical_Sheet_{home_team}_vs_{away_team}.md",
             mime="text/markdown"
