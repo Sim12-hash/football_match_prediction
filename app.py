@@ -266,11 +266,39 @@ input_vector = np.array([[
 # =========================================================
 # TAB 2: 赛前 A/B 变阵决策矩阵 (Manager Decision Board)
 # =========================================================
+# =========================================================
+# TAB 2: 赛前 A/B 变阵决策矩阵 (Manager Decision Board)
+# =========================================================
 with tab2:
+    # ---------------------------------------------------------
+    # 1. 核心计算引擎：蒙特卡洛 1000 次模拟 (不要删除这部分)
+    # ---------------------------------------------------------
+    a_min_bounds = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+    a_max_bounds = np.array([10.0, 100.0, 30.0, 50.0, 60.0, 50.0, 100.0])
+
+    N_SIM = 1000
+    np.random.seed(42)
+    noise = np.random.normal(0, 1, (N_SIM, 7))
+    scale = np.array([0.15, 2.5, 0.8, 0.8, 1.2, 1.0, 2.0])
+    
+    sim_inputs = np.clip(input_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
+    sim_probs = model.predict_proba(sim_inputs)
+
+    classes = list(model.classes_)
+    win_idx = classes.index('Win') if 'Win' in classes else 2
+    draw_idx = classes.index('Draw') if 'Draw' in classes else 0
+    loss_idx = classes.index('Loss') if 'Loss' in classes else 1
+
+    mc_win_pct = np.mean(sim_probs[:, win_idx]) * 100
+    mc_draw_pct = np.mean(sim_probs[:, draw_idx]) * 100
+    mc_loss_pct = np.mean(sim_probs[:, loss_idx]) * 100
+
+    # ---------------------------------------------------------
+    # 2. 极简前端 UI 渲染
+    # ---------------------------------------------------------
     st.subheader("⚖️ 战术底盘：A/B 变阵红利与 KPI 代价测算")
     st.caption("放弃花哨图表，直击核心利益。对比备选阵型对胜率及球队底层运转指标的真实影响。")
 
-    # 1. 顶部：保留核心的期望胜负平数据 (A计划基石)
     m1, m2, m3 = st.columns(3)
     with m1:
         st.markdown(f'<div class="metric-card-win"><div class="metric-title">方案A ({home_formation}) 期望胜率</div><div class="metric-value-win">{mc_win_pct:.1f}%</div></div>', unsafe_allow_html=True)
@@ -282,7 +310,6 @@ with tab2:
     st.markdown("<br>", unsafe_allow_html=True)
     st.divider()
 
-    # 2. 核心区：单栏宽幅设计的 B 计划对比矩阵
     with st.container(border=True):
         st.markdown("#### 🔄 启动备选方案 (Plan B)")
         
@@ -313,20 +340,15 @@ with tab2:
         st.markdown("##### 📊 变阵付出的战术代价与收益 (KPI Delta)")
         st.caption("与方案 A 相比，变阵为 B 计划后，球队在场上需要承担的结构性变化：")
         
-        # 3. 极简红绿数字差值面板
         k1, k2, k3, k4 = st.columns(4)
         
-        # 计算差值
         diff_xg = alt_mapped['xg'] - mapped_stats['xg']
         diff_poss = alt_mapped['possession'] - mapped_stats['possession']
         diff_ppda = alt_mapped['ppda'] - mapped_stats['ppda']
         diff_tackles = alt_mapped['tackles_successful'] - mapped_stats['tackles_successful']
         
-        # 使用 st.metric 原生组件展示差值 (极度清晰)
         k1.metric(label="进攻火力 (预期进球 xG)", value=f"{alt_mapped['xg']:.2f}", delta=f"{diff_xg:+.2f}")
         k2.metric(label="球权控制 (控球率 %)", value=f"{alt_mapped['possession']:.1f}%", delta=f"{diff_poss:+.1f}%")
-        
-        # 特殊处理 PPDA：PPDA 数值越低代表逼抢越凶，所以下降是好事（inverse=True）
         k3.metric(label="前场压迫 (PPDA)", value=f"{alt_mapped['ppda']:.1f}", delta=f"{diff_ppda:+.1f}", delta_color="inverse")
         k4.metric(label="防守硬度 (成功抢断)", value=f"{alt_mapped['tackles_successful']:.1f}", delta=f"{diff_tackles:+.1f}")
 # =========================================================
