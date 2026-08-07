@@ -215,7 +215,7 @@ with tab1:
         k3.metric("逼抢强度 PPDA", f"{mapped_stats['ppda']:.1f}", f"{mapped_stats['ppda'] - team_baseline['ppda']:+.1f}")
         k4.metric("成功抢断 Tackles", f"{mapped_stats['tackles_successful']:.1f}", f"{mapped_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}")
 
-   with col_panel:
+    with col_panel:
         st.subheader("📋 主帅赛前战术定调 (Manager Directives)")
         st.caption("选择本场核心战略，AI将自动解算为球员的量化执行 KPI。")
 
