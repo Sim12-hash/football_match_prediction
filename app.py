@@ -429,7 +429,4 @@ with tab3:
             file_name=f"Tactical_Sheet_{home_team}_vs_{away_team}.md",
             mime="text/markdown"
         )
-            data=report_text,
-            file_name=f"Tactical_Sheet_{home_team}_vs_{away_team}.md",
-            mime="text/markdown"
-        )
+        
