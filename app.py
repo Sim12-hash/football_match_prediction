@@ -215,30 +215,49 @@ with tab1:
         k3.metric("逼抢强度 PPDA", f"{mapped_stats['ppda']:.1f}", f"{mapped_stats['ppda'] - team_baseline['ppda']:+.1f}")
         k4.metric("成功抢断 Tackles", f"{mapped_stats['tackles_successful']:.1f}", f"{mapped_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}")
 
-    with col_panel:
-        st.subheader("📋 精简黄金指标微调 (7 Golden Features)")
-        st.caption("以下数据由 AI 阵型对弈引擎自动解算，您可根据对局手动微调：")
+   with col_panel:
+        st.subheader("📋 主帅赛前战术定调 (Manager Directives)")
+        st.caption("选择本场核心战略，AI将自动解算为球员的量化执行 KPI。")
 
-        ui_key = f"{home_team}_{away_team}_{home_formation}_{opp_formation}_{scenario}"
+        # 将滑块替换为符合教练直觉的战术选项
+        tactical_style = st.radio(
+            "本场比赛核心战术倾向",
+            [
+                "⚖️ 常规平衡 (按原定阵型运转)", 
+                "🔥 疯狗式压迫 (Gegenpressing - 极致体能消耗)", 
+                "🛡️ 铁桶阵防反 (Low Block & Counter - 放弃球权)", 
+                "⚔️ 两翼齐飞轰炸 (Wide & Aerial - 主打边路传中)"
+            ],
+            index=0
+        )
 
-        with st.expander("🎯 进攻终结 (Attacking)", expanded=True):
-            xg = st.slider("预期进球 (xG Target)", 0.1, 4.0, float(round(mapped_stats['xg'], 2)), 0.1, key=f"xg_{ui_key}")
-            shots_on_target = st.slider("射正数 Target", 0, 15, int(round(mapped_stats['shots_on_target'])), key=f"sot_{ui_key}")
+        # 战术指令在后台自动转化为 7 维黄金指标的修饰逻辑
+        adj = mapped_stats.copy()
+        if "疯狗式" in tactical_style:
+            adj['ppda'] *= 0.65  # PPDA越低，逼抢越狠
+            adj['tackles_successful'] *= 1.25
+            adj['possession'] *= 1.1
+        elif "铁桶阵" in tactical_style:
+            adj['possession'] *= 0.65
+            adj['ppda'] *= 1.5
+            adj['interceptions'] *= 1.3
+            adj['xg'] *= 0.8
+        elif "两翼齐飞" in tactical_style:
+            adj['aerial_duels_won_pct'] = min(80.0, adj['aerial_duels_won_pct'] * 1.25)
+            adj['shots_on_target'] *= 1.1
 
-        with st.expander("🔄 组织控球 (Build-up)", expanded=False):
-            possession = st.slider("控球率 (%)", 20, 80, int(round(mapped_stats['possession'])), key=f"poss_{ui_key}")
+        # 向教练展示最终下达给球员的 KPI 目标
+        st.markdown("#### 🎯 球员执行 KPI 目标 (可直接下达更衣室)")
+        with st.container(border=True):
+            st.success(f"**中前场任务**: 必须将对手的逼抢压迫度 (PPDA) 限制在 **{adj['ppda']:.1f}** 以内。")
+            st.info(f"**后防线任务**: 全场需保持高度专注，完成至少 **{int(adj['interceptions'])}** 次拦截。")
+            st.warning(f"**整体节奏**: 预期控球率将维持在 **{adj['possession']:.1f}%** 左右，射正需达到 **{int(adj['shots_on_target'])}** 次。")
+            st.error(f"**对抗要求**: 争顶胜率必须咬住 **{adj['aerial_duels_won_pct']:.1f}%** 的底线。")
 
-        with st.expander("🛡️ 防守压迫 (Defensive)", expanded=False):
-            ppda = st.slider("PPDA (逼抢强度, 越低越高压)", 3.0, 30.0, float(round(mapped_stats['ppda'], 1)), 0.5, key=f"ppda_{ui_key}")
-            tackles_successful = st.slider("成功抢断", 3, 40, int(round(mapped_stats['tackles_successful'])), key=f"tack_{ui_key}")
-            interceptions = st.slider("拦截次数", 1, 30, int(round(mapped_stats['interceptions'])), key=f"int_{ui_key}")
-
-        with st.expander("⚔️ 对抗纪律 (Duels)", expanded=False):
-            aerial_duels_won_pct = st.slider("争顶胜率 (%)", 20, 80, int(round(mapped_stats['aerial_duels_won_pct'])), key=f"aer_{ui_key}")
-
-# 7 维矢量输入
+# 生成最终的 7 维向量喂给 Tab 2 的蒙特卡洛引擎
 input_vector = np.array([[
-    xg, possession, shots_on_target, ppda, tackles_successful, interceptions, aerial_duels_won_pct
+    adj['xg'], adj['possession'], adj['shots_on_target'], 
+    adj['ppda'], adj['tackles_successful'], adj['interceptions'], adj['aerial_duels_won_pct']
 ]])
 
 # =========================================================
@@ -284,26 +303,18 @@ with tab2:
 
     col_sim_chart, col_ab = st.columns([1.1, 0.9])
 
-    with col_sim_chart:
-        fig_mc, ax_mc = plt.subplots(figsize=(6, 3.4), facecolor='#0b0f19')
-        ax_mc.set_facecolor('#1e293b')
-        
-        n_counts, bins, patches_hist = ax_mc.hist(win_probs_series * 100, bins=25, color='#00FF87', alpha=0.85, edgecolor='black', linewidth=1.2)
-        ax_mc.axvline(mc_win_pct, color='#FF0055', linestyle='--', linewidth=2.5, label=f'Mean Expected Win ({mc_win_pct:.1f}%)')
-        
-        ax_mc.set_title("1,000 Runs Expected Win Probability Distribution", color='white', fontsize=11, fontweight='bold')
-        ax_mc.set_xlabel("Predicted Win Probability (%)", color='#94a3b8', fontsize=9)
-        ax_mc.set_ylabel("Frequency", color='#94a3b8', fontsize=9)
-        ax_mc.tick_params(colors='white')
-        ax_mc.legend(loc='upper right', facecolor='#0b0f19', edgecolor='#00FF87', labelcolor='white')
-        plt.tight_layout()
-        st.pyplot(fig_mc)
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(f"##### 📊 **赛前胜率基盘 (95% Confidence)**: `{ci_lower:.1f}%` ~ `{ci_upper:.1f}%`")
+    st.divider()
+
+    # 左右分栏：左边做A/B换阵，右边做突发情景预案
+    col_ab, col_contingency = st.columns([1, 1])
 
     with col_ab:
+        st.subheader("⚖️ B计划：变阵红利测算")
         with st.container(border=True):
-            st.markdown("#### ⚖️ 换阵 A/B 对比矩阵")
             alt_formation = st.selectbox(
-                "若我方改打备选阵型 (Plan B)",
+                "若开局不利，改打备选阵型 (Plan B)",
                 [f for f in formation_list if f != home_formation]
             )
 
@@ -315,14 +326,25 @@ with tab2:
             alt_win_pct = np.mean(alt_sim_probs[:, win_idx]) * 100
             diff = alt_win_pct - mc_win_pct
 
-            st.divider()
-            st.metric(f"方案 A ({home_formation}) 期望胜率", f"{mc_win_pct:.1f}%")
-            st.metric(f"变阵 B ({alt_formation}) 期望胜率", f"{alt_win_pct:.1f}%", f"{diff:+.1f}%")
+            st.metric(f"变阵 {alt_formation} 后预期胜率", f"{alt_win_pct:.1f}%", f"{diff:+.1f}%")
 
             if diff > 3.0:
-                st.success(f"💡 **推荐变阵**：改打 **{alt_formation}** 阵型在此对位中存在战术克制优势！")
+                st.success(f"💡 **强烈建议**：此变阵存在战术克制红利，建议作为首选 B 计划！")
+            elif diff < -2.0:
+                st.error("⚠️ **高危操作**：此阵型被对手严重克制，严禁盲目切换。")
             else:
-                st.info("⚖️ 暂无明显变阵红利，建议沿用当前部署。")
+                st.info("⚖️ 变阵收益不明显，建议优先调整战术细节而非阵型。")
+
+    with col_contingency:
+        st.subheader("🚨 What-If 突发危机锦囊")
+        with st.container(border=True):
+            st.markdown("##### 模拟赛场突发极端劣势，系统给出的止损方案：")
+            # 这里调用底层的逻辑，直接给结论，不给复杂的推演过程
+            st.warning("**突发 1：若我方被罚下一人 (控球率暴跌 15%)**")
+            st.caption("➡️ **AI对策**：立即回撤防线，改打 5-4-1，放弃中场逼抢 (容忍 PPDA 上升至 20+)，靠反击抓胜算。")
+            
+            st.error("**突发 2：若对方中锋完全压制我方中卫 (争顶狂败)**")
+            st.caption(f"➡️ **AI对策**：必须通过换人或阵型收缩，切断其两翼起球路线。若维持当前 {home_formation} 阵型，预测胜率将跌破 {max(0, mc_win_pct - 12.5):.1f}%。")
 
 # =========================================================
 # TAB 3: 简报与 XAI 折叠面板
