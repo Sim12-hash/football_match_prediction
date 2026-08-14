@@ -255,25 +255,66 @@ def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
 
     return mapped
 
+# ---------------------------------------------------------
+# 5. Tactical Engine & Style Modifiers
+# ---------------------------------------------------------
 def apply_tactical_style(stats_dict, style):
-    """Further modifies metrics based on the manager's overarching tactical philosophy."""
+    """
+    Modifies core metrics based on the specific tactical philosophy chosen for the formation.
+    The engine parses keywords from the philosophy string to apply realistic stat buffs/nerfs.
+    """
     adj = stats_dict.copy()
-    if "Gegenpressing" in style:
-        adj['ppda'] *= 0.65  
+    
+    # 1. High Intensity / Pressing Variations (4-3-3, 3-4-3, 4-4-2 options)
+    if any(k in style for k in ["Gegenpressing", "High Press", "All-Out Attack"]):
+        adj['ppda'] *= 0.65  # Lower PPDA means extreme pressing
         adj['tackles_successful'] *= 1.25
         adj['possession'] *= 1.1
-    elif "Low Block" in style:
-        adj['possession'] *= 0.65
-        adj['ppda'] *= 1.5
-        adj['interceptions'] *= 1.3
-        adj['xg'] *= 0.8
-    elif "Wide Overload" in style:
+        if "All-Out Attack" in style:
+            adj['xg'] *= 1.3
+            adj['shots_on_target'] *= 1.3
+            
+    # 2. Defensive & Counter Variations (5-4-1, 4-4-2, 4-2-3-1 options)
+    elif any(k in style for k in ["Park the Bus", "Counter-Attack", "Long Ball"]):
+        adj['possession'] *= 0.65 # Concede possession
+        adj['xg'] *= 1.1 # Higher quality chances on the break
+        adj['shots_on_target'] *= 1.15
+        if "Park the Bus" in style:
+            adj['ppda'] *= 1.5
+            adj['interceptions'] *= 1.3
+            adj['xg'] *= 0.8 # Reduced overall xG for heavy defense
+        if "Long Ball" in style:
+            adj['aerial_duels_won_pct'] = min(85.0, adj['aerial_duels_won_pct'] * 1.3)
+            
+    # 3. Midfield & Control Variations (4-1-4-1, 4-2-3-1, 4-3-3 options)
+    elif any(k in style for k in ["Chokehold", "Mid-Block", "High Block Possession", "Playmaker"]):
+        adj['possession'] *= 1.15
+        adj['interceptions'] *= 1.2
+        if "Chokehold" in style or "Mid-Block" in style:
+            adj['tackles_successful'] *= 1.15
+            adj['possession'] *= 0.9 # Mid-block yields some possession
+            
+    # 4. Wide & Aerial Variations (3-5-2, 4-3-3 options)
+    elif any(k in style for k in ["Wide Overload", "Twin Striker"]):
         adj['aerial_duels_won_pct'] = min(80.0, adj['aerial_duels_won_pct'] * 1.25)
-        adj['shots_on_target'] *= 1.1
+        adj['shots_on_target'] *= 1.15
+        adj['xg'] *= 1.1
+        
     return adj
-
 # Calculate base collision stats before specific tactical flavor is applied
 mapped_stats_base = apply_formation_clash_engine(team_baseline, opp_baseline, home_formation, opp_formation, scenario)
+
+# Mapping specific tactical philosophies to their parent formations
+# The first item in each list acts as the fallback/default philosophy
+FORMATION_PHILOSOPHIES = {
+    "4-3-3": ["High Block Possession (Default)", "Gegenpressing (High Intensity)", "Wide Overload & Crossing"],
+    "4-1-4-1": ["Midfield Chokehold (Default)", "Mid-Block Press"],
+    "4-2-3-1": ["Balanced Double Pivot (Default)", "Fast Counter-Attack", "Playmaker Central Penetration"],
+    "3-4-3": ["All-Out Attack (Default)", "High Press Man-to-Man"],
+    "3-5-2": ["Balanced Attack/Defense (Default)", "Twin Striker Aerial Target"],
+    "4-4-2": ["Fast Counter-Attack (Default)", "Full-Pitch High Press"],
+    "5-4-1": ["Park the Bus (Default)", "Long Ball to Target Man"]
+}
 
 # ---------------------------------------------------------
 # 6. Main Dashboard layout (Tabs)
@@ -289,14 +330,13 @@ tab1, tab2, tab3 = st.tabs([
 # =========================================================
 with tab1:
     st.subheader("📋 Manager's Tactical Directives")
+    
+    # Dynamically fetch available philosophies based on the chosen formation
+    available_philosophies = FORMATION_PHILOSOPHIES.get(home_formation, ["Standard (Balanced setup)"])
+    
     tactical_style = st.radio(
-        "Core Philosophy for this Match",
-        [
-            "⚖️ Standard (Balanced setup based on formation)", 
-            "🔥 Gegenpressing (High Intensity, rapid recovery)", 
-            "🛡️ Low Block & Counter (Yield Possession, absorb pressure)", 
-            "⚔️ Wide Overload & Aerial (Cross & Header dominance)"
-        ],
+        f"Core Philosophy for {home_formation}",
+        available_philosophies,
         index=0,
         horizontal=True
     )
@@ -388,9 +428,14 @@ with tab2:
                 [f for f in formation_list if f != home_formation]
             )
 
-        # Applying the exact same tactical style to the alternate formation to ensure an apples-to-apples comparison
+       # 🔄 Tab 2: Inside the Plan B simulation container 
+        # Retrieve the default tactical philosophy for the NEW alternate formation
+        alt_default_style = FORMATION_PHILOSOPHIES.get(alt_formation, ["Standard"])[0]
+        
+        # Apply the exact clash engine and the new default style to ensure an apples-to-apples comparison
         alt_mapped_base = apply_formation_clash_engine(team_baseline, opp_baseline, alt_formation, opp_formation, scenario)
-        alt_mapped_styled = apply_tactical_style(alt_mapped_base, tactical_style)
+        alt_mapped_styled = apply_tactical_style(alt_mapped_base, alt_default_style)
+        
         alt_vector = np.array([[alt_mapped_styled[f] for f in tactical_features]])
         alt_sim_inputs = np.clip(alt_vector + noise * scale, a_min=a_min_bounds, a_max=a_max_bounds)
         
