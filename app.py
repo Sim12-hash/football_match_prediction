@@ -186,9 +186,21 @@ team_baseline = get_team_baseline(home_data, home_team, FEATURE_BASELINES)
 opp_baseline = get_team_baseline(away_data, away_team, FEATURE_BASELINES)
 
 st.sidebar.markdown("---")
-st.sidebar.header("📐 2. Formation Tactics")
+st.sidebar.header("📐 2. Formation & Philosophy")
+
 formation_list = list(FORMATION_TACTICS.keys())
 home_formation = st.sidebar.selectbox("Our Formation", formation_list, index=0)
+
+# Dynamically fetch available philosophies based on the chosen formation
+available_philosophies = FORMATION_PHILOSOPHIES.get(home_formation, ["Standard (Balanced setup)"])
+    
+# Moving the philosophy selector to the sidebar makes it globally fixed!
+tactical_style = st.sidebar.radio(
+    f"Philosophy for {home_formation}",
+    available_philosophies,
+    index=0
+)
+
 opp_formation = st.sidebar.selectbox("Opponent Formation", formation_list, index=1)
 
 st.sidebar.markdown("---")
@@ -328,25 +340,22 @@ tab1, tab2, tab3 = st.tabs([
 # =========================================================
 # TAB 1: 2D Pitch & Directives
 # =========================================================
+# =========================================================
+# TAB 1: 2D Pitch & Directives
+# =========================================================
 with tab1:
-    st.subheader("📋 Manager's Tactical Directives")
+    st.subheader("📋 Matchup & Tactical Execution Board")
+    st.caption("Adjust settings in the left sidebar to visualize dynamic tactical shifts.")
     
-    # Dynamically fetch available philosophies based on the chosen formation
-    available_philosophies = FORMATION_PHILOSOPHIES.get(home_formation, ["Standard (Balanced setup)"])
-    
-    tactical_style = st.radio(
-        f"Core Philosophy for {home_formation}",
-        available_philosophies,
-        index=0,
-        horizontal=True
-    )
-    
-    # Apply final tactical modifiers
+    # Calculate final stats (engine runs in the background using sidebar inputs)
     adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
 
-    st.divider()
-
     col_pitch, col_panel = st.columns([1.2, 1.0])
+
+    with col_pitch:
+        st.markdown("##### 🏟️ Formation Clash & Defensive Line")
+        fig_pitch = draw_2d_pitch_enhanced(home_formation, home_team)
+        st.pyplot(fig_pitch)
 
     with col_pitch:
         st.markdown("##### 🏟️ Formation Clash & Defensive Line")
@@ -513,7 +522,9 @@ with tab3:
 
     contributions = []
     for i, feat in enumerate(tactical_features):
-        base_val = FEATURE_BASELINES[feat]
+        # 🐛 BUG FIXED: We now use the team's specific historical baseline, NOT the global average!
+        # This ensures the narrative delta perfectly matches the UI metrics in Tab 1.
+        base_val = team_baseline[feat] 
         curr_val = current_vals[i]
         imp = rf_importances[i]
 
@@ -527,7 +538,7 @@ with tab3:
 
     with st.container(border=True):
         st.markdown(f"### 🏟️ Match Preview: {home_team} vs {away_team}")
-        st.caption(f"**Formation**: {home_formation} | **Style**: {tactical_style.split(' ')[1]} | **Base Win Prob**: {mc_win_pct:.1f}%")
+        st.caption(f"**Formation**: {home_formation} | **Style**: {tactical_style.split(' ')[0]} | **Base Win Prob**: {mc_win_pct:.1f}%")
         
         col_pos, col_neg = st.columns(2)
         
@@ -535,7 +546,7 @@ with tab3:
             st.markdown("##### ✅ Tactical Advantages (Primary Attack Vectors)")
             if top_positives:
                 for feat, val, score in top_positives:
-                    base_val = FEATURE_BASELINES[feat]
+                    base_val = team_baseline[feat] # FIXED
                     advice = get_dynamic_advice(feat, val, base_val, True, tactical_style)
                     st.success(f"**{feat.upper()}** (Value: `{val:.1f}`)\n\n*Analysis: {advice}*")
             else:
@@ -545,7 +556,7 @@ with tab3:
             st.markdown("##### ⚠️ Achilles' Heel (Areas to Defend)")
             if top_negatives:
                 for feat, val, score in top_negatives:
-                    base_val = FEATURE_BASELINES[feat]
+                    base_val = team_baseline[feat] # FIXED
                     advice = get_dynamic_advice(feat, val, base_val, False, tactical_style)
                     st.error(f"**{feat.upper()}** (Value: `{val:.1f}`)\n\n*Warning: {advice}*")
             else:
@@ -553,16 +564,17 @@ with tab3:
 
         st.divider()
         
+        # FIXED: Pass team_baseline to the markdown generator as well
         report_text = f"""# ⚽ Pre-Match Tactical Sheet: {home_team} vs {away_team}
-- **Starting Formation**: {home_formation} ({tactical_style.split(' ')[1]})
+- **Starting Formation**: {home_formation} ({tactical_style.split(' ')[0]})
 - **Expected Win Probability**: {mc_win_pct:.1f}% (Confidence Interval: {ci_lower:.1f}% ~ {ci_upper:.1f}%)
 
 ---
 ### ⚔️ Offensive Directives (Exploit Advantages):
 """
-        report_text += "\n".join([f"- Leverage our **{f.upper()}** dominance (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, FEATURE_BASELINES[f], True, tactical_style)}" for f, v, s in top_positives]) + "\n\n"
+        report_text += "\n".join([f"- Leverage our **{f.upper()}** dominance (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], True, tactical_style)}" for f, v, s in top_positives]) + "\n\n"
         report_text += "### 🛡️ Defensive Directives (Mitigate Risks):\n"
-        report_text += "\n".join([f"- Guard against **{f.upper()}** vulnerabilities (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, FEATURE_BASELINES[f], False, tactical_style)}" for f, v, s in top_negatives])
+        report_text += "\n".join([f"- Guard against **{f.upper()}** vulnerabilities (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], False, tactical_style)}" for f, v, s in top_negatives])
 
         st.download_button(
             label="📥 Export Markdown Tactical Sheet (For the Captain)",
