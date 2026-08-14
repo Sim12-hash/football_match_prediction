@@ -35,7 +35,7 @@ st.caption("职业足球赛前博弈推演、阵型对位引擎与 7 黄金特�
 # ---------------------------------------------------------
 @st.cache_data
 def load_datasets():
-    df_clean = pd.read_csv('clean_world_cup_2022.csv')
+    df_clean = pd.read_csv('clean_master_dataset.csv')
     return df_clean
 
 @st.cache_resource
