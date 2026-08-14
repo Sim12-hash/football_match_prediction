@@ -32,37 +32,7 @@ st.markdown("""
     }
     
     .metric-card-win { background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); border: 2px solid #00FF87; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
-    .metric-card-draw { background: linear-gradient(135deg, #713f12 0%, #451a03 100%); border: 2px solid #FACC15; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(250, 204, 21, 0.2); }
-    .metric-card-loss { background: linear-gradient(135deg, #881337 0%, #4c0519 100%); border: 2px solid #FF0055; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(255, 0, 85, 0.2); }
-    .metric-title { color: #94a3b8; font-size: 13px; font-weight: 600; text-transform: uppercase; }
-    .metric-value-win { color: #00FF87; font-size: 28px; font-weight: 800; }
-    .metric-value-draw { color: #FACC15; font-size: 28px; font-weight: 800; }
-    .metric-value-loss { color: #FF0055; font-size: 28px; font-weight: 800; }
-    </style>
-""", unsafe_allow_html=True)
-    
-    .metric-card-win { background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); border: 2px solid #00FF87; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
-    .metric-card-draw { background: linear-gradient(135deg, #713f12 0%, #451a03 100%); border: 2px solid #FACC15; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(250, 204, 21, 0.2); }
-    .metric-card-loss { background: linear-gradient(135deg, #881337 0%, #4c0519 100%); border: 2px solid #FF0055; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(255, 0, 85, 0.2); }
-    .metric-title { color: #94a3b8; font-size: 13px; font-weight: 600; text-transform: uppercase; }
-    .metric-value-win { color: #00FF87; font-size: 28px; font-weight: 800; }
-    .metric-value-draw { color: #FACC15; font-size: 28px; font-weight: 800; }
-    .metric-value-loss { color: #FF0055; font-size: 28px; font-weight: 800; }
-    </style>
-""", unsafe_allow_html=True)
-    
-    .metric-card-win { background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); border: 2px solid #00FF87; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
-    .metric-card-draw { background: linear-gradient(135deg, #713f12 0%, #451a03 100%); border: 2px solid #FACC15; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(250, 204, 21, 0.2); }
-    .metric-card-loss { background: linear-gradient(135deg, #881337 0%, #4c0519 100%); border: 2px solid #FF0055; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(255, 0, 85, 0.2); }
-    .metric-title { color: #94a3b8; font-size: 13px; font-weight: 600; text-transform: uppercase; }
-    .metric-value-win { color: #00FF87; font-size: 28px; font-weight: 800; }
-    .metric-value-draw { color: #FACC15; font-size: 28px; font-weight: 800; }
-    .metric-value-loss { color: #FF0055; font-size: 28px; font-weight: 800; }
-    </style>
-""", unsafe_allow_html=True)
-    
-    .metric-card-win { background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); border: 2px solid #00FF87; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
-    .metric-card-draw { background: linear-gradient(135deg, #713f12 0%, #451a03 100%); border: 2px solid #FACC15; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(250, 204, 21, 0.2); }
+    .metric-card-draw { background: linear-gradient(135deg, #713f12 0%, #451a03 100%); border: 2px solid #FACC15; border-radius: 10px; padding: 14px; text-align: center; box data-shadow: 0 0 12px rgba(250, 204, 21, 0.2); }
     .metric-card-loss { background: linear-gradient(135deg, #881337 0%, #4c0519 100%); border: 2px solid #FF0055; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(255, 0, 85, 0.2); }
     .metric-title { color: #94a3b8; font-size: 13px; font-weight: 600; text-transform: uppercase; }
     .metric-value-win { color: #00FF87; font-size: 28px; font-weight: 800; }
