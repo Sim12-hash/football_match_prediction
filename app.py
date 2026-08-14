@@ -14,10 +14,22 @@ st.set_page_config(
     layout="wide"
 )
 
-# Customizing the UI to look like a professional coaching dashboard
+# Customizing the UI and applying the "Sticky Tabs" CSS hack
 st.markdown("""
     <style>
     .main { background-color: #0b0f19; }
+    
+    /* Make the Streamlit Tabs sticky at the top while scrolling */
+    div[data-testid="stTabs"] > div:first-child {
+        position: sticky;
+        top: 2.8rem; /* Clears the default Streamlit header */
+        z-index: 999;
+        background-color: #0b0f19; /* Matches the background to hide text sliding under it */
+        padding-top: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #1e293b;
+    }
+    
     .metric-card-win { background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); border: 2px solid #00FF87; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
     .metric-card-draw { background: linear-gradient(135deg, #713f12 0%, #451a03 100%); border: 2px solid #FACC15; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(250, 204, 21, 0.2); }
     .metric-card-loss { background: linear-gradient(135deg, #881337 0%, #4c0519 100%); border: 2px solid #FF0055; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(255, 0, 85, 0.2); }
@@ -36,13 +48,10 @@ st.caption("Pre-match Tactical Simulator, Formation Matchup & Monte Carlo Engine
 # ---------------------------------------------------------
 @st.cache_data
 def load_datasets():
-    # We load the raw dataset here to populate the UI dropdowns with actual team names
-    # and to calculate authentic historical baselines.
     return pd.read_csv('data.csv')
 
 @st.cache_resource
 def load_model():
-    # Loading our undisputed champion: The Random Forest model
     return joblib.load('world_cup_rf_model_v2.pkl')
 
 try:
@@ -52,14 +61,12 @@ except Exception as e:
     st.sidebar.error(f"❌ Initialization Failed: {e}")
     st.stop()
 
-# Our core 7 Golden Features. Must match the training pipeline exactly.
 tactical_features = [
     'xg', 'possession', 'shots_on_target', 
     'ppda', 'tackles_successful', 'interceptions', 'aerial_duels_won_pct'
 ]
 
 def calculate_global_baselines(df):
-    """Calculates the global averages across all tournaments to serve as a fallback baseline."""
     baselines = {}
     home_pass_acc = df['home_completed_passes'].sum() / df['home_attempted_pases'].sum() * 100
     away_pass_acc = df['away_completed_passes'].sum() / df['away_attempted_pases'].sum() * 100
@@ -80,9 +87,8 @@ def calculate_global_baselines(df):
 FEATURE_BASELINES = calculate_global_baselines(df_raw)
 
 # ---------------------------------------------------------
-# 3. Tactical Dictionaries (Must be defined BEFORE the sidebar)
+# 3. Tactical Dictionaries
 # ---------------------------------------------------------
-# Mapping formations to visual and tactical metadata
 FORMATION_TACTICS = {
     "4-3-3": {"style": "High Press", "color": "#FF0055", "line_x": 68, "label": "🔥 HIGH PRESS LINE"},
     "4-2-3-1": {"style": "Balanced", "color": "#FACC15", "line_x": 55, "label": "⚖️ BALANCED LINE"},
@@ -93,7 +99,6 @@ FORMATION_TACTICS = {
     "4-1-4-1": {"style": "Delay & Block", "color": "#6366f1", "line_x": 45, "label": "🛑 DELAY & BLOCK"}
 }
 
-# Mapping specific tactical philosophies to their parent formations
 FORMATION_PHILOSOPHIES = {
     "4-3-3": ["High Block Possession (Default)", "Gegenpressing (High Intensity)", "Wide Overload & Crossing"],
     "4-1-4-1": ["Midfield Chokehold (Default)", "Mid-Block Press"],
@@ -109,19 +114,16 @@ FORMATION_PHILOSOPHIES = {
 # ---------------------------------------------------------
 st.sidebar.header("⚙️ 1. Matchup Configuration")
 
-# Extract unique teams dynamically from the raw dataset
 all_teams = sorted(set(df_raw['home_team'].unique().tolist() + df_raw['away_team'].unique().tolist()))
 
 col_h, col_a = st.sidebar.columns(2)
 home_team = col_h.selectbox("Our Team", all_teams, index=all_teams.index("Argentina") if "Argentina" in all_teams else 0)
 away_team = col_a.selectbox("Opponent Team", all_teams, index=all_teams.index("France") if "France" in all_teams else 1)
 
-# Filter historical data for the selected teams
 home_data = df_raw[(df_raw['home_team'] == home_team) | (df_raw['away_team'] == home_team)]
 away_data = df_raw[(df_raw['home_team'] == away_team) | (df_raw['away_team'] == away_team)]
 
 def get_team_baseline(team_df, team_name, global_base):
-    """Calculates the specific historical averages for a given team to serve as their baseline."""
     if team_df.empty: return global_base.copy()
     
     total_matches = len(team_df)
@@ -151,40 +153,26 @@ team_baseline = get_team_baseline(home_data, home_team, FEATURE_BASELINES)
 opp_baseline = get_team_baseline(away_data, away_team, FEATURE_BASELINES)
 
 st.sidebar.markdown("---")
-st.sidebar.header("📐 2. Formation & Philosophy")
+st.sidebar.header("📐 2. Formation")
 formation_list = list(FORMATION_TACTICS.keys())
 home_formation = st.sidebar.selectbox("Our Formation", formation_list, index=0)
-
-# Dynamically fetch available philosophies based on the chosen formation
-available_philosophies = FORMATION_PHILOSOPHIES.get(home_formation, ["Standard (Balanced setup)"])
-    
-tactical_style = st.sidebar.radio(
-    f"Philosophy for {home_formation}",
-    available_philosophies,
-    index=0
-)
-
 opp_formation = st.sidebar.selectbox("Opponent Formation", formation_list, index=1)
 
 st.sidebar.markdown("---")
 st.sidebar.header("🎯 3. Match Scenarios")
 scenario = st.sidebar.radio("Current Game State", ["Balanced Start (0-0)", "Trailing - Press All Out", "Leading - Park the Bus"], index=0)
 
-
 # ---------------------------------------------------------
 # 5. Tactical Engine & Style Modifiers
 # ---------------------------------------------------------
 def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
-    """Adjusts core metrics based on the natural clash between two formations."""
     mapped = home_base.copy()
     
-    # Intrinsic team strength gap modifier
     xg_diff_factor = (home_base['xg'] - opp_base['xg']) * 0.1
     poss_diff_factor = (home_base['possession'] - opp_base['possession']) * 0.15
     mapped['xg'] = max(0.2, mapped['xg'] + xg_diff_factor)
     mapped['possession'] = np.clip(mapped['possession'] + poss_diff_factor, 25.0, 75.0)
 
-    # Our formation buffs/nerfs
     if h_form == "4-3-3":
         mapped['ppda'] *= 0.75
         mapped['possession'] *= 1.1
@@ -208,7 +196,6 @@ def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
     elif h_form == "4-4-2":
         mapped['possession'] *= 0.9
 
-    # Opponent formation resistance modifiers
     if a_form in ["4-3-3", "3-4-3"]:
         mapped['possession'] -= 5.0
         mapped['ppda'] -= 1.0
@@ -217,7 +204,6 @@ def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
     elif a_form in ["3-5-2", "4-2-3-1"]:
         mapped['tackles_successful'] += 2.0
 
-    # Scenario overrides
     if scenario == "Trailing - Press All Out":
         mapped['ppda'] = 5.5
         mapped['tackles_successful'] += 5.0
@@ -232,13 +218,8 @@ def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
     return mapped
 
 def apply_tactical_style(stats_dict, style):
-    """
-    Modifies core metrics based on the specific tactical philosophy chosen for the formation.
-    The engine parses keywords from the philosophy string to apply realistic stat buffs/nerfs.
-    """
     adj = stats_dict.copy()
     
-    # 1. High Intensity / Pressing Variations
     if any(k in style for k in ["Gegenpressing", "High Press", "All-Out Attack"]):
         adj['ppda'] *= 0.65  
         adj['tackles_successful'] *= 1.25
@@ -247,7 +228,6 @@ def apply_tactical_style(stats_dict, style):
             adj['xg'] *= 1.3
             adj['shots_on_target'] *= 1.3
             
-    # 2. Defensive & Counter Variations
     elif any(k in style for k in ["Park the Bus", "Counter-Attack", "Long Ball"]):
         adj['possession'] *= 0.65 
         adj['xg'] *= 1.1 
@@ -259,7 +239,6 @@ def apply_tactical_style(stats_dict, style):
         if "Long Ball" in style:
             adj['aerial_duels_won_pct'] = min(85.0, adj['aerial_duels_won_pct'] * 1.3)
             
-    # 3. Midfield & Control Variations
     elif any(k in style for k in ["Chokehold", "Mid-Block", "High Block Possession", "Playmaker"]):
         adj['possession'] *= 1.15
         adj['interceptions'] *= 1.2
@@ -267,7 +246,6 @@ def apply_tactical_style(stats_dict, style):
             adj['tackles_successful'] *= 1.15
             adj['possession'] *= 0.9 
             
-    # 4. Wide & Aerial Variations
     elif any(k in style for k in ["Wide Overload", "Twin Striker"]):
         adj['aerial_duels_won_pct'] = min(80.0, adj['aerial_duels_won_pct'] * 1.25)
         adj['shots_on_target'] *= 1.15
@@ -275,15 +253,12 @@ def apply_tactical_style(stats_dict, style):
         
     return adj
 
-# Calculate base collision stats and apply tactical modifiers based on sidebar inputs
 mapped_stats_base = apply_formation_clash_engine(team_baseline, opp_baseline, home_formation, opp_formation, scenario)
-adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
 
 # ---------------------------------------------------------
 # 6. 2D Pitch Rendering Engine
 # ---------------------------------------------------------
 def draw_2d_pitch_enhanced(formation_name, team_name):
-    """Draws a tactical football pitch with formation nodes and defensive lines."""
     fig, ax = plt.subplots(figsize=(6, 4.2), facecolor='#0b0f19')
     ax.set_facecolor('#1e293b')
 
@@ -323,13 +298,6 @@ def draw_2d_pitch_enhanced(formation_name, team_name):
     return fig
 
 
-# Final feature vector prepared for the ML model
-input_vector = np.array([[
-    adj_stats['xg'], adj_stats['possession'], adj_stats['shots_on_target'], 
-    adj_stats['ppda'], adj_stats['tackles_successful'], adj_stats['interceptions'], adj_stats['aerial_duels_won_pct']
-]])
-
-
 # ---------------------------------------------------------
 # 7. Main Dashboard layout (Tabs)
 # ---------------------------------------------------------
@@ -344,7 +312,25 @@ tab1, tab2, tab3 = st.tabs([
 # =========================================================
 with tab1:
     st.subheader("📋 Matchup & Tactical Execution Board")
-    st.caption("Adjust settings in the left sidebar to visualize dynamic tactical shifts.")
+    
+    # Philosophy selector restored to Tab 1
+    available_philosophies = FORMATION_PHILOSOPHIES.get(home_formation, ["Standard (Balanced setup)"])
+    tactical_style = st.radio(
+        f"Core Philosophy for {home_formation}",
+        available_philosophies,
+        index=0,
+        horizontal=True
+    )
+    
+    # Calculate final stats using the selected tactical style
+    adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
+    
+    # Prepare final feature vector for the ML model
+    input_vector = np.array([[
+        adj_stats['xg'], adj_stats['possession'], adj_stats['shots_on_target'], 
+        adj_stats['ppda'], adj_stats['tackles_successful'], adj_stats['interceptions'], adj_stats['aerial_duels_won_pct']
+    ]])
+
     st.divider()
 
     col_pitch, col_panel = st.columns([1.2, 1.0])
