@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 # ---------------------------------------------------------
-# 1. 页面配置与超高对比度暗黑风 CSS
+# 1. Page Configuration & High-Contrast Dark Theme CSS
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Pro AI Football Tactical Engine",
@@ -14,6 +14,7 @@ st.set_page_config(
     layout="wide"
 )
 
+# Customizing the UI to look like a professional coaching dashboard
 st.markdown("""
     <style>
     .main { background-color: #0b0f19; }
@@ -28,59 +29,90 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("⚽ Pro AI Tactical Decision Support System")
-st.caption("职业足球赛前博弈推演、阵型对位引擎与 7 黄金特征蒙特卡洛引擎 (Head Coach Efficiency Edition)")
+st.caption("Pre-match Tactical Simulator, Formation Matchup & Monte Carlo Engine (Head Coach Edition)")
 
 # ---------------------------------------------------------
-# 2. 真实历史数据集与 v2 版 ML 模型动态加载
+# 2. Data Ingestion & Model Loading
 # ---------------------------------------------------------
 @st.cache_data
 def load_datasets():
-    df_clean = pd.read_csv('clean_master_dataset.csv')
-    return df_clean
+    # We load the raw dataset here. Why? Because the clean dataset stripped away the team names.
+    # We need the raw data to populate the UI dropdowns and calculate authentic historical baselines.
+    df_raw = pd.read_csv('data.csv')
+    return df_raw
 
 @st.cache_resource
 def load_model():
+    # Loading our undisputed champion: The Random Forest model
     return joblib.load('world_cup_rf_model_v2.pkl')
 
 try:
-    df_clean = load_datasets()
+    df_raw = load_datasets()
     model = load_model()
 except Exception as e:
-    st.sidebar.error(f"❌ 数据或模型加载失败: {e}")
+    st.sidebar.error(f"❌ Initialization Failed: {e}")
     st.stop()
 
-# 核心 7 黄金特征定义 (与 v2 模型完全对齐)
+# Our core 7 Golden Features. Must match the training pipeline exactly.
 tactical_features = [
     'xg', 'possession', 'shots_on_target', 
     'ppda', 'tackles_successful', 'interceptions', 'aerial_duels_won_pct'
 ]
 
-FEATURE_BASELINES = df_clean[tactical_features].mean().to_dict()
+# Calculate the global averages across all tournaments to serve as a fallback baseline
+def calculate_global_baselines(df):
+    baselines = {}
+    home_pass_acc = df['home_completed_passes'].sum() / df['home_attempted_pases'].sum() * 100
+    away_pass_acc = df['away_completed_passes'].sum() / df['away_attempted_pases'].sum() * 100
+    baselines['pass_accuracy'] = (home_pass_acc + away_pass_acc) / 2
+    
+    h_ppda = df['away_completed_passes'].sum() / max((df['home_tackles'] + df['home_interceptions']).sum(), 1)
+    a_ppda = df['home_completed_passes'].sum() / max((df['away_tackles'] + df['away_interceptions']).sum(), 1)
+    baselines['ppda'] = (h_ppda + a_ppda) / 2
+    
+    baselines['xg'] = (df['home_xg'].mean() + df['away_xg'].mean()) / 2
+    baselines['possession'] = 50.0 
+    baselines['shots_on_target'] = (df['home_sot'].mean() + df['away_sot'].mean()) / 2
+    baselines['tackles_successful'] = (df['home_tackles'].mean() + df['away_tackles'].mean()) / 2
+    baselines['interceptions'] = (df['home_interceptions'].mean() + df['away_interceptions'].mean()) / 2
+    baselines['aerial_duels_won_pct'] = 50.0 
+    
+    return baselines
 
+FEATURE_BASELINES = calculate_global_baselines(df_raw)
+
+# Mapping formations to visual and tactical metadata
 FORMATION_TACTICS = {
-    "4-3-3": {"style": "控球高压", "color": "#FF0055", "line_x": 68, "label": "🔥 HIGH PRESS LINE"},
-    "4-2-3-1": {"style": "常规平衡", "color": "#FACC15", "line_x": 55, "label": "⚖️ BALANCED LINE"},
-    "3-5-2": {"style": "中路控制", "color": "#00FF87", "line_x": 50, "label": "🔄 MIDFIELD CONTROL"},
-    "4-4-2": {"style": "传统反击", "color": "#38BDF8", "line_x": 40, "label": "⚡ COUNTER LINE"},
-    "5-4-1": {"style": "低位防反", "color": "#3b82f6", "line_x": 25, "label": "🛡️ LOW BLOCK LINE"},
-    "3-4-3": {"style": "边路强攻", "color": "#a855f7", "line_x": 65, "label": "⚔️ WIDE OVERLOAD"},
-    "4-1-4-1": {"style": "中场延误", "color": "#6366f1", "line_x": 45, "label": "🛑 DELAY & BLOCK"}
+    "4-3-3": {"style": "High Press", "color": "#FF0055", "line_x": 68, "label": "🔥 HIGH PRESS LINE"},
+    "4-2-3-1": {"style": "Balanced", "color": "#FACC15", "line_x": 55, "label": "⚖️ BALANCED LINE"},
+    "3-5-2": {"style": "Midfield Control", "color": "#00FF87", "line_x": 50, "label": "🔄 MIDFIELD CONTROL"},
+    "4-4-2": {"style": "Counter Attack", "color": "#38BDF8", "line_x": 40, "label": "⚡ COUNTER LINE"},
+    "5-4-1": {"style": "Low Block", "color": "#3b82f6", "line_x": 25, "label": "🛡️ LOW BLOCK LINE"},
+    "3-4-3": {"style": "Wide Overload", "color": "#a855f7", "line_x": 65, "label": "⚔️ WIDE OVERLOAD"},
+    "4-1-4-1": {"style": "Delay & Block", "color": "#6366f1", "line_x": 45, "label": "🛑 DELAY & BLOCK"}
 }
 
+# ---------------------------------------------------------
+# 3. 2D Pitch Rendering Engine
+# ---------------------------------------------------------
 def draw_2d_pitch_enhanced(formation_name, team_name):
+    """Draws a tactical football pitch with formation nodes and defensive lines."""
     fig, ax = plt.subplots(figsize=(6, 4.2), facecolor='#0b0f19')
     ax.set_facecolor('#1e293b')
 
+    # Pitch markings
     ax.plot([0, 0, 100, 100, 0], [0, 100, 100, 0, 0], color="white", alpha=0.3, linewidth=1.5)
     ax.plot([50, 50], [0, 100], color="white", alpha=0.3, linewidth=1.5)
     ax.add_patch(patches.Circle((50, 50), 12, color="white", fill=False, alpha=0.3, linewidth=1.5))
     ax.add_patch(patches.Rectangle((0, 20), 18, 60, color="white", fill=False, alpha=0.3, linewidth=1.5))
     ax.add_patch(patches.Rectangle((82, 20), 18, 60, color="white", fill=False, alpha=0.3, linewidth=1.5))
 
+    # Defensive line indicator
     tactic_info = FORMATION_TACTICS[formation_name]
     ax.axvline(x=tactic_info["line_x"], color=tactic_info["color"], linestyle='--', linewidth=2, alpha=0.8)
     ax.text(tactic_info["line_x"] + 1, 92, tactic_info["label"], color=tactic_info["color"], fontsize=8, fontweight='bold')
 
+    # X, Y coordinates for player nodes based on formation
     formations_coords = {
         "4-3-3": [(8,50), (28,18), (25,38), (25,62), (28,82), (50,28), (45,50), (50,72), (80,20), (85,50), (80,80)],
         "4-2-3-1": [(8,50), (28,18), (25,38), (25,62), (28,82), (42,35), (42,65), (65,20), (68,50), (65,80), (85,50)],
@@ -107,41 +139,76 @@ def draw_2d_pitch_enhanced(formation_name, team_name):
     return fig
 
 # ---------------------------------------------------------
-# 4. 侧边栏设置
+# 4. Sidebar Configuration (User Inputs)
 # ---------------------------------------------------------
-st.sidebar.header("⚙️ 1. 比赛对位设置 (Matchup)")
-all_teams = sorted(df_clean['team'].unique().tolist())
+st.sidebar.header("⚙️ 1. Matchup Configuration")
+
+# Extract unique teams dynamically from the raw dataset
+all_teams = sorted(set(df_raw['home_team'].unique().tolist() + df_raw['away_team'].unique().tolist()))
 
 col_h, col_a = st.sidebar.columns(2)
-home_team = col_h.selectbox("我方球队", all_teams, index=all_teams.index("Argentina") if "Argentina" in all_teams else 0)
-away_team = col_a.selectbox("对手球队", all_teams, index=all_teams.index("France") if "France" in all_teams else 1)
+home_team = col_h.selectbox("Our Team", all_teams, index=all_teams.index("Argentina") if "Argentina" in all_teams else 0)
+away_team = col_a.selectbox("Opponent Team", all_teams, index=all_teams.index("France") if "France" in all_teams else 1)
 
-home_data = df_clean[df_clean['team'] == home_team]
-away_data = df_clean[df_clean['team'] == away_team]
-team_baseline = home_data[tactical_features].mean().to_dict() if not home_data.empty else FEATURE_BASELINES.copy()
-opp_baseline = away_data[tactical_features].mean().to_dict() if not away_data.empty else FEATURE_BASELINES.copy()
+# Filter historical data for the selected teams
+home_data = df_raw[(df_raw['home_team'] == home_team) | (df_raw['away_team'] == home_team)]
+away_data = df_raw[(df_raw['home_team'] == away_team) | (df_raw['away_team'] == away_team)]
+
+def get_team_baseline(team_df, team_name, global_base):
+    """Calculates the specific historical averages for a given team to serve as their baseline."""
+    if team_df.empty: return global_base.copy()
+    
+    total_matches = len(team_df)
+    t_xg = 0; t_poss = 0; t_sot = 0; t_tackles = 0; t_inter = 0
+    t_ppda_num = 0; t_ppda_den = 0
+    
+    for _, row in team_df.iterrows():
+        if row['home_team'] == team_name:
+            t_xg += row['home_xg']; t_poss += row['home_possession']; t_sot += row['home_sot']
+            t_tackles += row['home_tackles']; t_inter += row['home_interceptions']
+            t_ppda_num += row['away_completed_passes']; t_ppda_den += (row['home_tackles'] + row['home_interceptions'])
+        else:
+            t_xg += row['away_xg']; t_poss += row['away_possession']; t_sot += row['away_sot']
+            t_tackles += row['away_tackles']; t_inter += row['away_interceptions']
+            t_ppda_num += row['home_completed_passes']; t_ppda_den += (row['away_tackles'] + row['away_interceptions'])
+            
+    base = global_base.copy()
+    base['xg'] = t_xg / total_matches
+    base['possession'] = t_poss / total_matches
+    base['shots_on_target'] = t_sot / total_matches
+    base['tackles_successful'] = t_tackles / total_matches
+    base['interceptions'] = t_inter / total_matches
+    base['ppda'] = t_ppda_num / max(t_ppda_den, 1)
+    
+    return base
+
+team_baseline = get_team_baseline(home_data, home_team, FEATURE_BASELINES)
+opp_baseline = get_team_baseline(away_data, away_team, FEATURE_BASELINES)
 
 st.sidebar.markdown("---")
-st.sidebar.header("📐 2. 阵型沙盘博弈 (Formations)")
+st.sidebar.header("📐 2. Formation Tactics")
 formation_list = list(FORMATION_TACTICS.keys())
-home_formation = st.sidebar.selectbox("我方部署阵型 (Our Formation)", formation_list, index=0)
-opp_formation = st.sidebar.selectbox("敌方部署阵型 (Opp Formation)", formation_list, index=1)
+home_formation = st.sidebar.selectbox("Our Formation", formation_list, index=0)
+opp_formation = st.sidebar.selectbox("Opponent Formation", formation_list, index=1)
 
 st.sidebar.markdown("---")
-st.sidebar.header("🎯 3. 比赛情景干预 (Scenarios)")
-scenario = st.sidebar.radio("比赛所处情景", ["常规开局 (0-0 Balanced)", "落后狂攻 (Press All Out)", "领先后缩 (Parking Bus)"], index=0)
+st.sidebar.header("🎯 3. Match Scenarios")
+scenario = st.sidebar.radio("Current Game State", ["Balanced Start (0-0)", "Trailing - Press All Out", "Leading - Park the Bus"], index=0)
 
 # ---------------------------------------------------------
-# 5. 7 黄金维度阵型对弈引擎 & 战术风格修饰器
+# 5. Tactical Engine & Style Modifiers
 # ---------------------------------------------------------
 def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
+    """Adjusts core metrics based on the natural clash between two formations."""
     mapped = home_base.copy()
     
+    # Intrinsic team strength gap modifier
     xg_diff_factor = (home_base['xg'] - opp_base['xg']) * 0.1
     poss_diff_factor = (home_base['possession'] - opp_base['possession']) * 0.15
     mapped['xg'] = max(0.2, mapped['xg'] + xg_diff_factor)
     mapped['possession'] = np.clip(mapped['possession'] + poss_diff_factor, 25.0, 75.0)
 
+    # Our formation buffs/nerfs
     if h_form == "4-3-3":
         mapped['ppda'] *= 0.75
         mapped['possession'] *= 1.1
@@ -165,6 +232,7 @@ def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
     elif h_form == "4-4-2":
         mapped['possession'] *= 0.9
 
+    # Opponent formation resistance modifiers
     if a_form in ["4-3-3", "3-4-3"]:
         mapped['possession'] -= 5.0
         mapped['ppda'] -= 1.0
@@ -173,12 +241,13 @@ def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
     elif a_form in ["3-5-2", "4-2-3-1"]:
         mapped['tackles_successful'] += 2.0
 
-    if scenario == "落后狂攻 (Press All Out)":
+    # Scenario overrides
+    if scenario == "Trailing - Press All Out":
         mapped['ppda'] = 5.5
         mapped['tackles_successful'] += 5.0
         mapped['xg'] *= 1.2
         mapped['shots_on_target'] *= 1.2
-    elif scenario == "领先后缩 (Parking Bus)":
+    elif scenario == "Leading - Park the Bus":
         mapped['possession'] = 33.0
         mapped['ppda'] = 20.0
         mapped['xg'] *= 0.6
@@ -186,100 +255,96 @@ def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
 
     return mapped
 
-# 核心解耦：独立的战术风格修饰函数
 def apply_tactical_style(stats_dict, style):
+    """Further modifies metrics based on the manager's overarching tactical philosophy."""
     adj = stats_dict.copy()
-    if "疯狗式" in style:
+    if "Gegenpressing" in style:
         adj['ppda'] *= 0.65  
         adj['tackles_successful'] *= 1.25
         adj['possession'] *= 1.1
-    elif "铁桶阵" in style:
+    elif "Low Block" in style:
         adj['possession'] *= 0.65
         adj['ppda'] *= 1.5
         adj['interceptions'] *= 1.3
         adj['xg'] *= 0.8
-    elif "两翼齐飞" in style:
+    elif "Wide Overload" in style:
         adj['aerial_duels_won_pct'] = min(80.0, adj['aerial_duels_won_pct'] * 1.25)
         adj['shots_on_target'] *= 1.1
     return adj
 
-# 先算出底层的阵型对冲数据
+# Calculate base collision stats before specific tactical flavor is applied
 mapped_stats_base = apply_formation_clash_engine(team_baseline, opp_baseline, home_formation, opp_formation, scenario)
 
 # ---------------------------------------------------------
-# 6. Tab 选项卡主界面排版
+# 6. Main Dashboard layout (Tabs)
 # ---------------------------------------------------------
 tab1, tab2, tab3 = st.tabs([
-    "🏟️ 1. 战术沙盘微调 (Tactical Board)",
-    "⚖️ 2. A/B 变阵决策矩阵 (Manager Board)",
-    "📑 3. 教练战术简报 (Executive Brief)"
+    "🏟️ 1. Tactical Board",
+    "⚖️ 2. Manager's A/B Matrix",
+    "📑 3. Executive Brief"
 ])
 
 # =========================================================
-# TAB 1: 2D 足球场 + 战术指令下达
-# =========================================================
-# =========================================================
-# TAB 1: 2D 足球场 + 战术指令下达
+# TAB 1: 2D Pitch & Directives
 # =========================================================
 with tab1:
-    # ⚠️ 修复点：先把战术选项放出来，把参数算好，再去渲染 UI！
-    st.subheader("📋 主帅赛前战术定调 (Manager Directives)")
+    st.subheader("📋 Manager's Tactical Directives")
     tactical_style = st.radio(
-        "本场比赛核心战术倾向",
+        "Core Philosophy for this Match",
         [
-            "⚖️ 常规平衡 (按原定阵型运转)", 
-            "🔥 疯狗式压迫 (Gegenpressing - 极致体能消耗)", 
-            "🛡️ 铁桶阵防反 (Low Block & Counter - 放弃球权)", 
-            "⚔️ 两翼齐飞轰炸 (Wide & Aerial - 主打边路传中)"
+            "⚖️ Standard (Balanced setup based on formation)", 
+            "🔥 Gegenpressing (High Intensity, rapid recovery)", 
+            "🛡️ Low Block & Counter (Yield Possession, absorb pressure)", 
+            "⚔️ Wide Overload & Aerial (Cross & Header dominance)"
         ],
         index=0,
-        horizontal=True # 横向排版更省空间
+        horizontal=True
     )
     
-    # 后台立即应用战术修饰得到最终 A 计划数据
+    # Apply final tactical modifiers
     adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
 
     st.divider()
 
-    # 然后再分左右栏渲染画面，确保所有图表都使用最新的 adj_stats
     col_pitch, col_panel = st.columns([1.2, 1.0])
 
     with col_pitch:
-        st.markdown("##### 🏟️ 阵型对弈与防线落位图层")
+        st.markdown("##### 🏟️ Formation Clash & Defensive Line")
         fig_pitch = draw_2d_pitch_enhanced(home_formation, home_team)
         st.pyplot(fig_pitch)
 
-        st.markdown("##### 📈 战术执行对球队 KPI 的动态影响")
+        st.markdown("##### 📈 Dynamic Impact on Team KPIs")
         k1, k2, k3, k4 = st.columns(4)
-        # ⚠️ 修复点：这里全部改用 adj_stats，数字就会跟着战术动了！
-        k1.metric("预期进球 xG", f"{adj_stats['xg']:.2f}", f"{adj_stats['xg'] - team_baseline['xg']:+.2f}")
-        k2.metric("控球率 Possession", f"{adj_stats['possession']:.1f}%", f"{adj_stats['possession'] - team_baseline['possession']:+.1f}%")
-        k3.metric("逼抢强度 PPDA", f"{adj_stats['ppda']:.1f}", f"{adj_stats['ppda'] - team_baseline['ppda']:+.1f}", delta_color="inverse")
-        k4.metric("成功抢断 Tackles", f"{adj_stats['tackles_successful']:.1f}", f"{adj_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}")
+        k1.metric("Expected Goals (xG)", f"{adj_stats['xg']:.2f}", f"{adj_stats['xg'] - team_baseline['xg']:+.2f}")
+        k2.metric("Possession", f"{adj_stats['possession']:.1f}%", f"{adj_stats['possession'] - team_baseline['possession']:+.1f}%")
+        k3.metric("Pressing (PPDA)", f"{adj_stats['ppda']:.1f}", f"{adj_stats['ppda'] - team_baseline['ppda']:+.1f}", delta_color="inverse")
+        k4.metric("Tackles Won", f"{adj_stats['tackles_successful']:.1f}", f"{adj_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}")
 
     with col_panel:
-        st.markdown("#### 🎯 球员执行 KPI 目标 (可直接下达更衣室)")
+        st.markdown("#### 🎯 Player Execution KPIs (Locker Room Directives)")
         with st.container(border=True):
-            st.success(f"**中前场任务**: 将对手的逼抢压迫度 (PPDA) 限制在 **{adj_stats['ppda']:.1f}** 以内。")
-            st.info(f"**后防线任务**: 全场需保持高度专注，完成至少 **{int(adj_stats['interceptions'])}** 次拦截。")
-            st.warning(f"**整体节奏**: 预期控球率将维持在 **{adj_stats['possession']:.1f}%** 左右，射正需达到 **{int(adj_stats['shots_on_target'])}** 次。")
-            st.error(f"**对抗要求**: 争顶胜率必须咬住 **{adj_stats['aerial_duels_won_pct']:.1f}%** 的底线。")
+            st.success(f"**Midfield Task**: Restrict the opponent's build-up. Keep our PPDA strictly under **{adj_stats['ppda']:.1f}**.")
+            st.info(f"**Defensive Task**: Maintain absolute positional discipline. We need at least **{int(adj_stats['interceptions'])}** clean interceptions.")
+            st.warning(f"**Tempo Control**: Expect to hold approximately **{adj_stats['possession']:.1f}%** possession. Offensive units must secure **{int(adj_stats['shots_on_target'])}** shots on target.")
+            st.error(f"**Physicality**: Aerial duels are non-negotiable today. Win rate must stay above **{adj_stats['aerial_duels_won_pct']:.1f}%**.")
 
-# 生成最终的 7 维向量喂给引擎
+# Final feature vector prepared for the ML model
 input_vector = np.array([[
     adj_stats['xg'], adj_stats['possession'], adj_stats['shots_on_target'], 
     adj_stats['ppda'], adj_stats['tackles_successful'], adj_stats['interceptions'], adj_stats['aerial_duels_won_pct']
 ]])
 
 # =========================================================
-# TAB 2: 赛前 A/B 变阵决策矩阵
+# TAB 2: A/B Formation Decision Matrix
 # =========================================================
 with tab2:
+    # Defining logical boundaries for Monte Carlo simulation clipping
     a_min_bounds = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
     a_max_bounds = np.array([10.0, 100.0, 30.0, 50.0, 60.0, 50.0, 100.0])
 
     N_SIM = 1000
     np.random.seed(42)
+    # Injecting random noise to simulate match unpredictability
     noise = np.random.normal(0, 1, (N_SIM, 7))
     scale = np.array([0.15, 2.5, 0.8, 0.8, 1.2, 1.0, 2.0])
     
@@ -299,31 +364,31 @@ with tab2:
     ci_lower = np.percentile(win_probs_series, 2.5) * 100
     ci_upper = np.percentile(win_probs_series, 97.5) * 100
 
-    st.subheader("⚖️ 战术底盘：A/B 变阵红利与 KPI 代价测算")
-    st.caption("放弃花哨图表，直击核心利益。对比备选阵型对胜率及球队底层运转指标的真实影响。")
+    st.subheader("⚖️ Tactical Core: A/B Formation ROI & KPI Cost")
+    st.caption("Evaluate the true probability impacts of your tactical setup. Pure, data-driven insights.")
 
     m1, m2, m3 = st.columns(3)
     with m1:
-        st.markdown(f'<div class="metric-card-win"><div class="metric-title">方案A ({home_formation}) 期望胜率</div><div class="metric-value-win">{mc_win_pct:.1f}%</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card-win"><div class="metric-title">Plan A ({home_formation}) Win Prob</div><div class="metric-value-win">{mc_win_pct:.1f}%</div></div>', unsafe_allow_html=True)
     with m2:
-        st.markdown(f'<div class="metric-card-draw"><div class="metric-title">期望平局</div><div class="metric-value-draw">{mc_draw_pct:.1f}%</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card-draw"><div class="metric-title">Draw Prob</div><div class="metric-value-draw">{mc_draw_pct:.1f}%</div></div>', unsafe_allow_html=True)
     with m3:
-        st.markdown(f'<div class="metric-card-loss"><div class="metric-title">期望负率</div><div class="metric-value-loss">{mc_loss_pct:.1f}%</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card-loss"><div class="metric-title">Loss Prob</div><div class="metric-value-loss">{mc_loss_pct:.1f}%</div></div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.divider()
 
     with st.container(border=True):
-        st.markdown("#### 🔄 启动备选方案 (Plan B)")
+        st.markdown("#### 🔄 Initiate Plan B")
         
         col_select, col_advice = st.columns([1, 1.5])
         with col_select:
             alt_formation = st.selectbox(
-                "若需变阵，请选择 B 计划落位：",
+                "Select alternative formation to evaluate:",
                 [f for f in formation_list if f != home_formation]
             )
 
-        # 完美修补逻辑断层：B计划也必须继承战术修饰器！
+        # Applying the exact same tactical style to the alternate formation to ensure an apples-to-apples comparison
         alt_mapped_base = apply_formation_clash_engine(team_baseline, opp_baseline, alt_formation, opp_formation, scenario)
         alt_mapped_styled = apply_tactical_style(alt_mapped_base, tactical_style)
         alt_vector = np.array([[alt_mapped_styled[f] for f in tactical_features]])
@@ -335,13 +400,13 @@ with tab2:
 
         with col_advice:
             if diff_win > 3.0:
-                st.success(f"💡 **教练组建议**：改打 **{alt_formation}** 预期胜率将暴涨 **+{diff_win:.1f}%**！存在极佳战术克制红利，强烈推荐。")
+                st.success(f"💡 **Coaching Staff Advice**: Switching to **{alt_formation}** boosts expected win rate by **+{diff_win:.1f}%**! Highly recommended due to a strong tactical mismatch.")
             elif diff_win < -2.0:
-                st.error(f"⚠️ **高危警告**：改打 **{alt_formation}** 预期胜率将跌至 **{alt_win_pct:.1f}%**。被对手严重限制，严禁盲目尝试。")
+                st.error(f"⚠️ **High-Risk Warning**: Switching to **{alt_formation}** drops win rate to **{alt_win_pct:.1f}%**. The opponent counters this setup heavily. Avoid.")
             else:
-                st.info(f"⚖️ **战术评估**：改打 **{alt_formation}** 胜率变化为 **{diff_win:+.1f}%**。收益不明显，建议优先临场微调。")
+                st.info(f"⚖️ **Tactical Assessment**: Changing to **{alt_formation}** yields a **{diff_win:+.1f}%** shift. Marginal impact; rely on player execution and in-game tweaks.")
 
-        st.markdown("##### 📊 变阵付出的战术代价与收益 (KPI Delta)")
+        st.markdown("##### 📊 Tactical Cost & Benefit of Formation Change (KPI Delta)")
         
         k1, k2, k3, k4 = st.columns(4)
         diff_xg = alt_mapped_styled['xg'] - adj_stats['xg']
@@ -349,55 +414,55 @@ with tab2:
         diff_ppda = alt_mapped_styled['ppda'] - adj_stats['ppda']
         diff_tackles = alt_mapped_styled['tackles_successful'] - adj_stats['tackles_successful']
         
-        k1.metric("预期进球 xG", f"{alt_mapped_styled['xg']:.2f}", f"{diff_xg:+.2f}")
-        k2.metric("控球率 %", f"{alt_mapped_styled['possession']:.1f}%", f"{diff_poss:+.1f}%")
-        k3.metric("前场压迫 PPDA", f"{alt_mapped_styled['ppda']:.1f}", f"{diff_ppda:+.1f}", delta_color="inverse")
-        k4.metric("成功抢断", f"{alt_mapped_styled['tackles_successful']:.1f}", f"{diff_tackles:+.1f}")
+        k1.metric("Expected Goals (xG)", f"{alt_mapped_styled['xg']:.2f}", f"{diff_xg:+.2f}")
+        k2.metric("Possession %", f"{alt_mapped_styled['possession']:.1f}%", f"{diff_poss:+.1f}%")
+        k3.metric("Pressing (PPDA)", f"{alt_mapped_styled['ppda']:.1f}", f"{diff_ppda:+.1f}", delta_color="inverse")
+        k4.metric("Tackles Won", f"{alt_mapped_styled['tackles_successful']:.1f}", f"{diff_tackles:+.1f}")
 
 # =========================================================
-# TAB 3: 数据驱动的动态叙事引擎 (Data-Driven Narrative Engine)
+# TAB 3: Data-Driven Narrative Engine (Executive Brief)
 # =========================================================
 with tab3:
-    st.subheader("📑 赛前主帅执行单 (Executive Brief)")
-    st.caption("基于随机森林权重与实时数值偏差，动态生成的个性化战术对抗报告。")
+    st.subheader("📑 Pre-Match Executive Brief")
+    st.caption("Dynamically generated tactical report based on Random Forest feature weights and real-time numerical deviations.")
 
-    # 🚀 核心升级：废除硬编码静态文本，采用“数值插值与偏差感知”的动态引擎
     def get_dynamic_advice(feat, curr_val, base_val, is_advantage, style):
+        """Translates raw mathematical deviations into human-readable coaching intelligence."""
         diff = curr_val - base_val
         abs_diff = abs(diff)
-        direction = "高出" if diff > 0 else "低于"
+        direction = "higher" if diff > 0 else "lower"
         
-        # 针对不同特征，结合真实数值与战术风格动态拼装“专属于本场比赛”的描述
         if feat == 'ppda':
-            # PPDA 越低压迫越凶
-            press_intensity = "极具侵略性（高位绞杀）" if curr_val < 11 else "趋于稳健保守（低位退防）"
-            return f"当前 PPDA 测算为 {curr_val:.1f}（较赛事基准 {base_val:.1f} {direction} {abs_diff:.1f} 维）。结合当前【{style.split(' ')[1]}】打法，整体防线压迫呈现**{press_intensity}**态势，需警惕身后空间被利用。"
+            press_intensity = "Highly Aggressive (High Press)" if curr_val < 11 else "Conservative (Low Block)"
+            return f"Current PPDA is tracking at {curr_val:.1f} (which is {abs_diff:.1f} {direction} than baseline). Reflecting our '{style.split(' ')[1]}' approach, the defensive unit is operating in a **{press_intensity}** state. Watch out for spaces left behind the backline."
             
         elif feat == 'possession':
-            control_type = "绝对球权掌控" if curr_val > 50 else "主动让渡球权、主打防反"
-            return f"预期控球率锁定在 {curr_val:.1f}%（基准均值 {base_val:.1f}%，波动 {diff:+.1f}%）。战术反馈为**{control_type}**，中场球员需严格把控传导失误率。"
+            control_type = "Absolute ball control" if curr_val > 50 else "Conceding possession to hit on the counter"
+            return f"Expected possession is {curr_val:.1f}% (fluctuating {diff:+.1f}% from norm). This indicates **{control_type}**. Midfielders must prioritize pass completion in the middle third."
             
         elif feat == 'xg':
-            threat_level = "极高，具备持续破门能力" if curr_val > 1.3 else "偏弱，需精简进攻配合"
-            return f"预期进球 (xG) 评估为 {curr_val:.2f}（历史基准 {base_val:.2f}，变动 {diff:+.2f}）。进攻终结威胁**{threat_level}**，直接锚定禁区内的战术转化率。"
+            threat_level = "Lethal, capable of consistent scoring" if curr_val > 1.3 else "Sub-optimal, requiring efficient chance creation"
+            return f"Expected Goals (xG) evaluated at {curr_val:.2f} (shifting {diff:+.2f} from historical average). Offensive threat is currently **{threat_level}**. Conversion in the final third will dictate the outcome."
             
         elif feat == 'shots_on_target':
-            return f"预期射正次数为 {int(curr_val)} 次（均值参考 {base_val:.1f}）。多维进攻打击力度{'充沛' if curr_val >= base_val else '有所欠缺'}，要求中前场必须增加远射与门前二次包抄。"
+            status = "plentiful" if curr_val >= base_val else "lacking"
+            return f"Projected shots on target: {int(curr_val)}. Offensive output is **{status}**. Attackers are instructed to increase shots from outside the box and hunt for rebounds."
             
         elif feat == 'tackles_successful':
-            return f"成功抢断预估 {int(curr_val)} 次（基准 {base_val:.1f}）。中场绞杀硬度{'达标' if curr_val >= base_val else '存在隐患'}，直接决定对对手核心出球点的限制效果。"
+            status = "sufficient" if curr_val >= base_val else "vulnerable"
+            return f"Successful tackles estimated at {int(curr_val)}. Midfield grit and defensive solidity is **{status}**. Crucial for disrupting the opponent's primary playmakers."
             
         elif feat == 'interceptions':
-            return f"拦截次数预计达 {int(curr_val)} 次（基准 {base_val:.1f}）。防线预判与延误能力{'优秀' if curr_val >= base_val else '偏弱'}，需重点切断对手的直塞球线路。"
+            status = "Excellent" if curr_val >= base_val else "Sub-par"
+            return f"Interceptions projected at {int(curr_val)}. Defensive anticipation is **{status}**. The backline must actively cut off passing lanes and through-balls."
             
         elif feat == 'aerial_duels_won_pct':
-            air_status = "制空权优势明显" if curr_val >= 50 else "高空争夺处于劣势"
-            return f"争顶胜率预期为 {curr_val:.1f}%（基准 {base_val:.1f}%）。高空球控制力评估：**{air_status}**，直接左右定位球及边路传中的防守质量。"
+            air_status = "Dominant in the air" if curr_val >= 50 else "Struggling with aerial battles"
+            return f"Aerial win rate anticipated at {curr_val:.1f}%. Assessment: **{air_status}**. This directly impacts our vulnerability to set-pieces and wide crosses."
             
-        # 兜底动态生成
-        return f"指标数值为 {curr_val:.1f}（历史基准 {base_val:.1f}，偏离度 {diff:+.1f}），需在实战中重点针对性部署。"
+        return f"Metric value is {curr_val:.1f} (deviation {diff:+.1f} from norm). Requires specific in-game monitoring."
 
-    # --- 以下是生成报告的逻辑重构 ---
+    # Interrogating the Random Forest model for feature importance weights
     rf_importances = model.feature_importances_
     current_vals = input_vector[0]
 
@@ -416,49 +481,46 @@ with tab3:
     top_negatives = [c for c in contributions if c[2] < 0][-3:]
 
     with st.container(border=True):
-        st.markdown(f"### 🏟️ 赛前定调: {home_team} vs {away_team}")
-        st.caption(f"**部署阵型**：{home_formation} | **战术打法**：{tactical_style.split(' ')[1]} | **基础胜率**: {mc_win_pct:.1f}%")
+        st.markdown(f"### 🏟️ Match Preview: {home_team} vs {away_team}")
+        st.caption(f"**Formation**: {home_formation} | **Style**: {tactical_style.split(' ')[1]} | **Base Win Prob**: {mc_win_pct:.1f}%")
         
         col_pos, col_neg = st.columns(2)
         
         with col_pos:
-            st.markdown("##### ✅ 战术红利点 (主攻方向)")
+            st.markdown("##### ✅ Tactical Advantages (Primary Attack Vectors)")
             if top_positives:
                 for feat, val, score in top_positives:
-                    # 💡 传入实时计算出来的 curr_val 和 base_val 进行动态插值
                     base_val = FEATURE_BASELINES[feat]
                     advice = get_dynamic_advice(feat, val, base_val, True, tactical_style)
-                    st.success(f"**{feat.upper()}** (指标: `{val:.1f}`)\n\n*动态解析：{advice}*")
+                    st.success(f"**{feat.upper()}** (Value: `{val:.1f}`)\n\n*Analysis: {advice}*")
             else:
-                st.caption("暂无明显数据优势。")
+                st.caption("No distinct statistical advantages found.")
 
         with col_neg:
-            st.markdown("##### ⚠️ 致命阿喀琉斯之踵 (严防死守)")
+            st.markdown("##### ⚠️ Achilles' Heel (Areas to Defend)")
             if top_negatives:
                 for feat, val, score in top_negatives:
-                    # 💡 传入实时计算出来的 curr_val 和 base_val 进行动态插值
                     base_val = FEATURE_BASELINES[feat]
                     advice = get_dynamic_advice(feat, val, base_val, False, tactical_style)
-                    st.error(f"**{feat.upper()}** (指标: `{val:.1f}`)\n\n*动态警告：{advice}*")
+                    st.error(f"**{feat.upper()}** (Value: `{val:.1f}`)\n\n*Warning: {advice}*")
             else:
-                st.caption("风险受控。")
+                st.caption("Risks are currently managed.")
 
         st.divider()
         
-        # Markdown 战术执行单同步升级为数值驱动
-        report_text = f"""# ⚽ 赛前战术执行单: {home_team} vs {away_team}
-- **首发阵型**: {home_formation} ({tactical_style.split(' ')[1]})
-- **预期胜率**: {mc_win_pct:.1f}% (置信区间 {ci_lower:.1f}% ~ {ci_upper:.1f}%)
+        report_text = f"""# ⚽ Pre-Match Tactical Sheet: {home_team} vs {away_team}
+- **Starting Formation**: {home_formation} ({tactical_style.split(' ')[1]})
+- **Expected Win Probability**: {mc_win_pct:.1f}% (Confidence Interval: {ci_lower:.1f}% ~ {ci_upper:.1f}%)
 
 ---
-### ⚔️ 进攻端主攻指令:
+### ⚔️ Offensive Directives (Exploit Advantages):
 """
-        report_text += "\n".join([f"- 发挥 **{f.upper()}** 优势（当前值 {v:.1f}）。执行方案：{get_dynamic_advice(f, v, FEATURE_BASELINES[f], True, tactical_style)}" for f, v, s in top_positives]) + "\n\n"
-        report_text += "### 🛡️ 防守端避险指令:\n"
-        report_text += "\n".join([f"- 警惕 **{f.upper()}** 崩盘风险（当前值 {v:.1f}）。应对方案：{get_dynamic_advice(f, v, FEATURE_BASELINES[f], False, tactical_style)}" for f, v, s in top_negatives])
+        report_text += "\n".join([f"- Leverage our **{f.upper()}** dominance (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, FEATURE_BASELINES[f], True, tactical_style)}" for f, v, s in top_positives]) + "\n\n"
+        report_text += "### 🛡️ Defensive Directives (Mitigate Risks):\n"
+        report_text += "\n".join([f"- Guard against **{f.upper()}** vulnerabilities (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, FEATURE_BASELINES[f], False, tactical_style)}" for f, v, s in top_negatives])
 
         st.download_button(
-            label="📥 导出 Markdown 战术执行单 (交由队长传达)",
+            label="📥 Export Markdown Tactical Sheet (For the Captain)",
             data=report_text,
             file_name=f"Tactical_Sheet_{home_team}_vs_{away_team}.md",
             mime="text/markdown"
