@@ -296,21 +296,33 @@ def draw_2d_pitch_enhanced(formation_name, team_name):
     plt.tight_layout()
     return fig
 
+# ---------------------------------------------------------
+# 7. MAIN DASHBOARD ROUTING (With Session State Memory)
+# ---------------------------------------------------------
 
-# ---------------------------------------------------------
-# 7. MAIN DASHBOARD ROUTING (Replacing Tabs)
-# ---------------------------------------------------------
+# ✨ THE FIX: Session State to remember the coach's philosophy across pages
+if 'current_formation' not in st.session_state or st.session_state.current_formation != home_formation:
+    st.session_state.current_formation = home_formation
+    st.session_state.selected_philosophy = available_philosophies[0]
 
 if app_mode == "🏟️ 1. Tactical Board":
     st.subheader("📋 Matchup & Tactical Execution Board")
     
-    # We display the radio buttons for philosophy ONLY when viewing the Tactical Board
+    # Attempt to find the index of the previously selected philosophy
+    try:
+        current_idx = available_philosophies.index(st.session_state.selected_philosophy)
+    except ValueError:
+        current_idx = 0
+        
     tactical_style = st.radio(
         f"Core Philosophy for {home_formation}",
         available_philosophies,
-        index=0,
+        index=current_idx,
         horizontal=True
     )
+    
+    # Save the current selection immediately to memory
+    st.session_state.selected_philosophy = tactical_style
     
     # Calculate final stats using the selected tactical style
     adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
@@ -342,9 +354,9 @@ if app_mode == "🏟️ 1. Tactical Board":
 
 elif app_mode == "⚖️ 2. Manager's A/B Matrix":
     
-    # Needs to silently evaluate default philosophy to run simulations properly
-    default_style = available_philosophies[0]
-    adj_stats = apply_tactical_style(mapped_stats_base, default_style)
+    # Fetch the exact tactical style chosen by the coach in Tab 1 from memory
+    tactical_style = st.session_state.selected_philosophy
+    adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
     
     input_vector = np.array([[
         adj_stats['xg'], adj_stats['possession'], adj_stats['shots_on_target'], 
@@ -434,16 +446,15 @@ elif app_mode == "⚖️ 2. Manager's A/B Matrix":
 
 elif app_mode == "📑 3. Executive Brief":
     
-    # Needs to silently evaluate default philosophy to generate report
-    default_style = available_philosophies[0]
-    adj_stats = apply_tactical_style(mapped_stats_base, default_style)
+    # Fetch the exact tactical style chosen by the coach in Tab 1 from memory
+    tactical_style = st.session_state.selected_philosophy
+    adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
     
     input_vector = np.array([[
         adj_stats['xg'], adj_stats['possession'], adj_stats['shots_on_target'], 
         adj_stats['ppda'], adj_stats['tackles_successful'], adj_stats['interceptions'], adj_stats['aerial_duels_won_pct']
     ]])
     
-    # We recalculate the basic MC win % strictly for display in the brief
     classes = list(model.classes_)
     win_idx = classes.index('Win') if 'Win' in classes else 2
     mc_win_pct = np.mean(model.predict_proba(input_vector)[:, win_idx]) * 100
@@ -505,7 +516,7 @@ elif app_mode == "📑 3. Executive Brief":
 
     with st.container(border=True):
         st.markdown(f"### 🏟️ Match Preview: {home_team} vs {away_team}")
-        st.caption(f"**Formation**: {home_formation} | **Style**: {default_style.split(' ')[0]} | **Base Win Prob**: {mc_win_pct:.1f}%")
+        st.caption(f"**Formation**: {home_formation} | **Style**: {tactical_style.split(' ')[0]} | **Base Win Prob**: {mc_win_pct:.1f}%")
         
         col_pos, col_neg = st.columns(2)
         
@@ -514,7 +525,7 @@ elif app_mode == "📑 3. Executive Brief":
             if top_positives:
                 for feat, val, score in top_positives:
                     base_val = team_baseline[feat] 
-                    advice = get_dynamic_advice(feat, val, base_val, True, default_style)
+                    advice = get_dynamic_advice(feat, val, base_val, True, tactical_style)
                     st.success(f"**{feat.upper()}** (Value: `{val:.1f}`)\n\n*Analysis: {advice}*")
             else:
                 st.caption("No distinct statistical advantages found.")
@@ -524,7 +535,7 @@ elif app_mode == "📑 3. Executive Brief":
             if top_negatives:
                 for feat, val, score in top_negatives:
                     base_val = team_baseline[feat] 
-                    advice = get_dynamic_advice(feat, val, base_val, False, default_style)
+                    advice = get_dynamic_advice(feat, val, base_val, False, tactical_style)
                     st.error(f"**{feat.upper()}** (Value: `{val:.1f}`)\n\n*Warning: {advice}*")
             else:
                 st.caption("Risks are currently managed.")
@@ -532,15 +543,15 @@ elif app_mode == "📑 3. Executive Brief":
         st.divider()
         
         report_text = f"""# ⚽ Pre-Match Tactical Sheet: {home_team} vs {away_team}
-- **Starting Formation**: {home_formation} ({default_style.split(' ')[0]})
+- **Starting Formation**: {home_formation} ({tactical_style.split(' ')[0]})
 - **Expected Win Probability**: {mc_win_pct:.1f}%
 
 ---
 ### ⚔️ Offensive Directives (Exploit Advantages):
 """
-        report_text += "\n".join([f"- Leverage our **{f.upper()}** dominance (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], True, default_style)}" for f, v, s in top_positives]) + "\n\n"
+        report_text += "\n".join([f"- Leverage our **{f.upper()}** dominance (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], True, tactical_style)}" for f, v, s in top_positives]) + "\n\n"
         report_text += "### 🛡️ Defensive Directives (Mitigate Risks):\n"
-        report_text += "\n".join([f"- Guard against **{f.upper()}** vulnerabilities (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], False, default_style)}" for f, v, s in top_negatives])
+        report_text += "\n".join([f"- Guard against **{f.upper()}** vulnerabilities (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], False, tactical_style)}" for f, v, s in top_negatives])
 
         st.download_button(
             label="📥 Export Markdown Tactical Sheet (For the Captain)",
