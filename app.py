@@ -14,25 +14,35 @@ st.set_page_config(
     layout="wide"
 )
 
-# Customizing the UI and applying the "Ultimate Sticky Tabs" CSS hack
+# Injecting the ultimate CSS override to force Streamlit tabs to remain sticky
 st.markdown("""
     <style>
     .main { background-color: #0b0f19; }
     
-    /* Ultimate Sticky Tabs Fix for Streamlit BaseWeb container */
-    div[data-testid="stTabs"] [data-baseweb="tab-list"] {
-        position: -webkit-sticky !important;
-        position: sticky !important;
-        top: 2.875rem !important; 
-        z-index: 9999 !important;
-        background-color: #0b0f19 !important; 
-        padding-top: 15px !important;
-        padding-bottom: 10px !important;
-        border-bottom: 2px solid #1e293b !important;
+    /* 1. Hide the default Streamlit header to prevent overlap issues */
+    header { visibility: hidden !important; }
+    
+    /* 2. Force the main block container to allow visible overflow */
+    /* If this is not set to visible, 'position: sticky' will completely fail */
+    .main .block-container {
+        overflow: visible !important;
     }
     
+    /* 3. The absolute sticky hack targeting the first child of the stTabs wrapper */
+    div[data-testid="stTabs"] > div:nth-child(1) {
+        position: -webkit-sticky !important;
+        position: sticky !important;
+        top: 0rem !important; /* Stick strictly to the top edge */
+        z-index: 99999 !important; /* Ensure it floats above all charts and text */
+        background-color: #0b0f19 !important; /* Match the dark theme background */
+        padding-top: 1.5rem !important;
+        padding-bottom: 1rem !important;
+        border-bottom: 1px solid #1e293b !important;
+    }
+    
+    /* Data metric card styling */
     .metric-card-win { background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); border: 2px solid #00FF87; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
-    .metric-card-draw { background: linear-gradient(135deg, #713f12 0%, #451a03 100%); border: 2px solid #FACC15; border-radius: 10px; padding: 14px; text-align: center; box data-shadow: 0 0 12px rgba(250, 204, 21, 0.2); }
+    .metric-card-draw { background: linear-gradient(135deg, #713f12 0%, #451a03 100%); border: 2px solid #FACC15; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(250, 204, 21, 0.2); }
     .metric-card-loss { background: linear-gradient(135deg, #881337 0%, #4c0519 100%); border: 2px solid #FF0055; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(255, 0, 85, 0.2); }
     .metric-title { color: #94a3b8; font-size: 13px; font-weight: 600; text-transform: uppercase; }
     .metric-value-win { color: #00FF87; font-size: 28px; font-weight: 800; }
