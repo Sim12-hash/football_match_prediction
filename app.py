@@ -336,12 +336,35 @@ if app_mode == "🏟️ 1. Tactical Board":
         fig_pitch = draw_2d_pitch_enhanced(home_formation, home_team)
         st.pyplot(fig_pitch)
 
-        st.markdown("##### 📈 Dynamic Impact on Team KPIs")
+      st.markdown("##### 📈 Dynamic Impact on Team KPIs")
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("Expected Goals (xG)", f"{adj_stats['xg']:.2f}", f"{adj_stats['xg'] - team_baseline['xg']:+.2f}")
-        k2.metric("Possession", f"{adj_stats['possession']:.1f}%", f"{adj_stats['possession'] - team_baseline['possession']:+.1f}%")
-        k3.metric("Pressing (PPDA)", f"{adj_stats['ppda']:.1f}", f"{adj_stats['ppda'] - team_baseline['ppda']:+.1f}", delta_color="inverse")
-        k4.metric("Tackles Won", f"{adj_stats['tackles_successful']:.1f}", f"{adj_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}")
+        
+        # Added explicit tactical labels and hover tooltips for instant coach comprehension
+        k1.metric(
+            label="🎯 xG (Scoring Threat)", 
+            value=f"{adj_stats['xg']:.2f}", 
+            delta=f"{adj_stats['xg'] - team_baseline['xg']:+.2f}",
+            help="Expected Goals. Higher value = Creating better, more lethal scoring chances."
+        )
+        k2.metric(
+            label="⚽ Possession (Game Control)", 
+            value=f"{adj_stats['possession']:.1f}%", 
+            delta=f"{adj_stats['possession'] - team_baseline['possession']:+.1f}%",
+            help="Ball control percentage. Higher value = Dominating the game tempo and dictating play."
+        )
+        k3.metric(
+            label="🏃 PPDA (Pressing Intensity)", 
+            value=f"{adj_stats['ppda']:.1f}", 
+            delta=f"{adj_stats['ppda'] - team_baseline['ppda']:+.1f}", 
+            delta_color="inverse", # Lower PPDA is historically better (more aggressive)
+            help="Passes Allowed Per Defensive Action. LOWER value = Fiercer, more aggressive high press."
+        )
+        k4.metric(
+            label="🛡️ Tackles (Defensive Solidity)", 
+            value=f"{adj_stats['tackles_successful']:.1f}", 
+            delta=f"{adj_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}",
+            help="Successful tackles won. Higher value = Stronger physical dominance in midfield/defense."
+        )
 
     with col_panel:
         st.markdown("#### 🎯 Player Execution KPIs (Locker Room Directives)")
@@ -431,17 +454,16 @@ elif app_mode == "⚖️ 2. Manager's A/B Matrix":
                 st.info(f"⚖️ **Tactical Assessment**: Changing to **{alt_formation}** yields a **{diff_win:+.1f}%** shift. Marginal impact; rely on player execution and in-game tweaks.")
 
         st.markdown("##### 📊 Tactical Cost & Benefit of Formation Change (KPI Delta)")
-        
         k1, k2, k3, k4 = st.columns(4)
         diff_xg = alt_mapped_styled['xg'] - adj_stats['xg']
         diff_poss = alt_mapped_styled['possession'] - adj_stats['possession']
         diff_ppda = alt_mapped_styled['ppda'] - adj_stats['ppda']
         diff_tackles = alt_mapped_styled['tackles_successful'] - adj_stats['tackles_successful']
         
-        k1.metric("Expected Goals (xG)", f"{alt_mapped_styled['xg']:.2f}", f"{diff_xg:+.2f}")
-        k2.metric("Possession %", f"{alt_mapped_styled['possession']:.1f}%", f"{diff_poss:+.1f}%")
-        k3.metric("Pressing (PPDA)", f"{alt_mapped_styled['ppda']:.1f}", f"{diff_ppda:+.1f}", delta_color="inverse")
-        k4.metric("Tackles Won", f"{alt_mapped_styled['tackles_successful']:.1f}", f"{diff_tackles:+.1f}")
+        k1.metric("🎯 xG (Scoring Threat)", f"{alt_mapped_styled['xg']:.2f}", f"{diff_xg:+.2f}", help="Impact on our scoring chances if we switch to Plan B.")
+        k2.metric("⚽ Possession (Control)", f"{alt_mapped_styled['possession']:.1f}%", f"{diff_poss:+.1f}%", help="Impact on ball control if we switch to Plan B.")
+        k3.metric("🏃 PPDA (Pressing)", f"{alt_mapped_styled['ppda']:.1f}", f"{diff_ppda:+.1f}", delta_color="inverse", help="Impact on pressing intensity. Negative delta means a fiercer press.")
+        k4.metric("🛡️ Tackles (Solidity)", f"{alt_mapped_styled['tackles_successful']:.1f}", f"{diff_tackles:+.1f}", help="Impact on defensive interventions.")
 
 
 elif app_mode == "📑 3. Executive Brief":
