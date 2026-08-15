@@ -469,15 +469,21 @@ elif app_mode == "⚖️ 2. Manager's A/B Matrix":
 
 elif app_mode == "📑 3. Executive Brief":
     
-    # Fetch the exact tactical style chosen by the coach in Tab 1 from memory
+    # Retrieve the exact tactical philosophy the manager selected in Tab 1 from our session memory, 
+    # ensuring absolute continuity across the dashboard.
     tactical_style = st.session_state.selected_philosophy
+    
+    # Re-evaluate the baseline collision stats using the manager's chosen philosophy.
     adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
     
+    # Construct the final tactical feature vector. 
+    # This is the exact payload our Random Forest model will analyze.
     input_vector = np.array([[
         adj_stats['xg'], adj_stats['possession'], adj_stats['shots_on_target'], 
         adj_stats['ppda'], adj_stats['tackles_successful'], adj_stats['interceptions'], adj_stats['aerial_duels_won_pct']
     ]])
     
+    # Interrogate the Random Forest model to calculate the baseline win probability for the executive summary.
     classes = list(model.classes_)
     win_idx = classes.index('Win') if 'Win' in classes else 2
     mc_win_pct = np.mean(model.predict_proba(input_vector)[:, win_idx]) * 100
@@ -486,6 +492,10 @@ elif app_mode == "📑 3. Executive Brief":
     st.caption("Dynamically generated tactical report based on Random Forest feature weights and real-time numerical deviations.")
 
     def get_dynamic_advice(feat, curr_val, base_val, is_advantage, style):
+        """
+        Translates raw mathematical deviations into actionable, locker-room-ready coaching advice.
+        This bridges the gap between complex data science and on-pitch execution.
+        """
         diff = curr_val - base_val
         abs_diff = abs(diff)
         direction = "higher" if diff > 0 else "lower"
@@ -520,10 +530,15 @@ elif app_mode == "📑 3. Executive Brief":
             
         return f"Metric value is {curr_val:.1f} (deviation {diff:+.1f} from norm). Requires specific in-game monitoring."
 
+    # Extract the feature importances from our trained Random Forest model. 
+    # We need to know which statistical pillars actually dictate the outcome today.
     rf_importances = model.feature_importances_
     current_vals = input_vector[0]
 
     contributions = []
+    
+    # Calculate the weighted impact of each tactical metric. 
+    # We multiply the raw deviation by the model's feature importance to find our true game-changers.
     for i, feat in enumerate(tactical_features):
         base_val = team_baseline[feat] 
         curr_val = current_vals[i]
@@ -533,6 +548,7 @@ elif app_mode == "📑 3. Executive Brief":
         score = diff * imp
         contributions.append((feat, curr_val, score))
 
+    # Sort the contributions to isolate the top 3 match-winning advantages and the top 3 critical vulnerabilities.
     contributions.sort(key=lambda x: x[2], reverse=True)
     top_positives = [c for c in contributions if c[2] > 0][:3]
     top_negatives = [c for c in contributions if c[2] < 0][-3:]
@@ -561,19 +577,17 @@ elif app_mode == "📑 3. Executive Brief":
                     advice = get_dynamic_advice(feat, val, base_val, False, tactical_style)
                     st.error(f"**{feat.upper()}** (Value: `{val:.1f}`)\n\n*Warning: {advice}*")
             else:
-                st.caption("Risks are currently managed.")
-
-        st.divider()
-        
-        report_text = f"""# ⚽ Pre-Match Tactical Sheet: {home_team} vs {away_team}
-- **Starting Formation**: {home_formation} ({tactical_style.split(' ')[0]})
-- **Expected Win Probability**: {mc_win_pct:.1f}%
-
----
-### ⚔️ Offensive Directives (Exploit Advantages):
-"""
-        report_text += "\n".join([f"- Leverage our **{f.upper()}** dominance (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], True, tactical_style)}" for f, v, s in top_positives]) + "\n\n"
-        report_text += "### 🛡️ Defensive Directives (Mitigate Risks):\n"
-        report_text += "\n".join([f"- Guard against **{f.upper()}** vulnerabilities (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], False, tactical_style)}" for f, v, s in top_negatives])
-
+                # 🚀 Advanced Empty State Design: 
+                # What if the manager crafts a flawless tactic with no statistical weaknesses?
+                # Instead of leaving a confusing blank space, we celebrate the tactical balance and reassure the coaching staff.
+                st.success("🛡️ **Perfectly Balanced (Zero Tactical Deficits)**")
+                st.caption("All core metrics are performing at or above your historical baseline. No distinct statistical vulnerabilities detected for this setup.")
+                
+                # Dynamically identify the unsung heroes—metrics that didn't make the top 3 advantages, 
+                # but are performing safely above the historical baseline to secure our foundation.
+                managed_feats = [c[0] for c in contributions if c[2] >= 0 and c not in top_positives]
+                
+                if managed_feats:
+                    safe_str = ", ".join([f.upper() for f in managed_feats])
+                    st.info(f"**✅ Secured Metrics**: \n\n`{safe_str}` \n\nThese areas remain highly stable under the current tactic. Your defensive and transition phases are fully covered.")
        
