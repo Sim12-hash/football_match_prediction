@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 # ---------------------------------------------------------
-# 1. Page Configuration & High-Contrast Dark Theme CSS
+# 1. Page Configuration & Clean Dark Theme CSS
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Pro AI Football Tactical Engine",
@@ -14,33 +14,11 @@ st.set_page_config(
     layout="wide"
 )
 
-# Injecting the ultimate CSS override to force Streamlit tabs to remain sticky
+# We removed all the complex CSS tab hacks. 
+# Keeping only the clean UI styling for our metric cards.
 st.markdown("""
     <style>
     .main { background-color: #0b0f19; }
-    
-    /* 1. Hide the default Streamlit header to prevent overlap issues */
-    header { visibility: hidden !important; }
-    
-    /* 2. Force the main block container to allow visible overflow */
-    /* If this is not set to visible, 'position: sticky' will completely fail */
-    .main .block-container {
-        overflow: visible !important;
-    }
-    
-    /* 3. The absolute sticky hack targeting the first child of the stTabs wrapper */
-    div[data-testid="stTabs"] > div:nth-child(1) {
-        position: -webkit-sticky !important;
-        position: sticky !important;
-        top: 0rem !important; /* Stick strictly to the top edge */
-        z-index: 99999 !important; /* Ensure it floats above all charts and text */
-        background-color: #0b0f19 !important; /* Match the dark theme background */
-        padding-top: 1.5rem !important;
-        padding-bottom: 1rem !important;
-        border-bottom: 1px solid #1e293b !important;
-    }
-    
-    /* Data metric card styling */
     .metric-card-win { background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); border: 2px solid #00FF87; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(0, 255, 135, 0.2); }
     .metric-card-draw { background: linear-gradient(135deg, #713f12 0%, #451a03 100%); border: 2px solid #FACC15; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(250, 204, 21, 0.2); }
     .metric-card-loss { background: linear-gradient(135deg, #881337 0%, #4c0519 100%); border: 2px solid #FF0055; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 0 12px rgba(255, 0, 85, 0.2); }
@@ -121,8 +99,17 @@ FORMATION_PHILOSOPHIES = {
 }
 
 # ---------------------------------------------------------
-# 4. Sidebar Configuration (User Inputs)
+# 4. FIXED SIDEBAR NAVIGATION & SETTINGS
 # ---------------------------------------------------------
+# THE FIX: Using a sidebar radio button instead of Streamlit Tabs. 
+# The sidebar is natively sticky and never scrolls out of view!
+st.sidebar.header("🧭 Dashboard Navigation")
+app_mode = st.sidebar.radio(
+    "Select View:",
+    ["🏟️ 1. Tactical Board", "⚖️ 2. Manager's A/B Matrix", "📑 3. Executive Brief"]
+)
+
+st.sidebar.markdown("---")
 st.sidebar.header("⚙️ 1. Matchup Configuration")
 
 all_teams = sorted(set(df_raw['home_team'].unique().tolist() + df_raw['away_team'].unique().tolist()))
@@ -185,46 +172,29 @@ def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
     mapped['possession'] = np.clip(mapped['possession'] + poss_diff_factor, 25.0, 75.0)
 
     if h_form == "4-3-3":
-        mapped['ppda'] *= 0.75
-        mapped['possession'] *= 1.1
-        mapped['xg'] *= 1.15
-        mapped['shots_on_target'] *= 1.15
+        mapped['ppda'] *= 0.75; mapped['possession'] *= 1.1; mapped['xg'] *= 1.15; mapped['shots_on_target'] *= 1.15
     elif h_form == "5-4-1":
-        mapped['possession'] *= 0.75
-        mapped['ppda'] *= 1.3
-        mapped['xg'] *= 0.8
-        mapped['shots_on_target'] *= 0.8
+        mapped['possession'] *= 0.75; mapped['ppda'] *= 1.3; mapped['xg'] *= 0.8; mapped['shots_on_target'] *= 0.8
     elif h_form == "4-1-4-1":
-        mapped['interceptions'] *= 1.25
-        mapped['tackles_successful'] *= 1.15
-        mapped['possession'] *= 0.95
+        mapped['interceptions'] *= 1.25; mapped['tackles_successful'] *= 1.15; mapped['possession'] *= 0.95
     elif h_form == "3-4-3":
-        mapped['xg'] *= 1.2
-        mapped['shots_on_target'] *= 1.2
+        mapped['xg'] *= 1.2; mapped['shots_on_target'] *= 1.2
     elif h_form == "3-5-2":
-        mapped['possession'] *= 1.05
-        mapped['tackles_successful'] *= 1.1
+        mapped['possession'] *= 1.05; mapped['tackles_successful'] *= 1.1
     elif h_form == "4-4-2":
         mapped['possession'] *= 0.9
 
     if a_form in ["4-3-3", "3-4-3"]:
-        mapped['possession'] -= 5.0
-        mapped['ppda'] -= 1.0
+        mapped['possession'] -= 5.0; mapped['ppda'] -= 1.0
     elif a_form in ["5-4-1", "4-1-4-1"]:
         mapped['possession'] += 6.0
     elif a_form in ["3-5-2", "4-2-3-1"]:
         mapped['tackles_successful'] += 2.0
 
     if scenario == "Trailing - Press All Out":
-        mapped['ppda'] = 5.5
-        mapped['tackles_successful'] += 5.0
-        mapped['xg'] *= 1.2
-        mapped['shots_on_target'] *= 1.2
+        mapped['ppda'] = 5.5; mapped['tackles_successful'] += 5.0; mapped['xg'] *= 1.2; mapped['shots_on_target'] *= 1.2
     elif scenario == "Leading - Park the Bus":
-        mapped['possession'] = 33.0
-        mapped['ppda'] = 20.0
-        mapped['xg'] *= 0.6
-        mapped['shots_on_target'] *= 0.6
+        mapped['possession'] = 33.0; mapped['ppda'] = 20.0; mapped['xg'] *= 0.6; mapped['shots_on_target'] *= 0.6
 
     return mapped
 
@@ -232,39 +202,33 @@ def apply_tactical_style(stats_dict, style):
     adj = stats_dict.copy()
     
     if any(k in style for k in ["Gegenpressing", "High Press", "All-Out Attack"]):
-        adj['ppda'] *= 0.65  
-        adj['tackles_successful'] *= 1.25
-        adj['possession'] *= 1.1
+        adj['ppda'] *= 0.65; adj['tackles_successful'] *= 1.25; adj['possession'] *= 1.1
         if "All-Out Attack" in style:
-            adj['xg'] *= 1.3
-            adj['shots_on_target'] *= 1.3
+            adj['xg'] *= 1.3; adj['shots_on_target'] *= 1.3
             
     elif any(k in style for k in ["Park the Bus", "Counter-Attack", "Long Ball"]):
-        adj['possession'] *= 0.65 
-        adj['xg'] *= 1.1 
-        adj['shots_on_target'] *= 1.15
+        adj['possession'] *= 0.65; adj['xg'] *= 1.1; adj['shots_on_target'] *= 1.15
         if "Park the Bus" in style:
-            adj['ppda'] *= 1.5
-            adj['interceptions'] *= 1.3
-            adj['xg'] *= 0.8 
+            adj['ppda'] *= 1.5; adj['interceptions'] *= 1.3; adj['xg'] *= 0.8 
         if "Long Ball" in style:
             adj['aerial_duels_won_pct'] = min(85.0, adj['aerial_duels_won_pct'] * 1.3)
             
     elif any(k in style for k in ["Chokehold", "Mid-Block", "High Block Possession", "Playmaker"]):
-        adj['possession'] *= 1.15
-        adj['interceptions'] *= 1.2
+        adj['possession'] *= 1.15; adj['interceptions'] *= 1.2
         if "Chokehold" in style or "Mid-Block" in style:
-            adj['tackles_successful'] *= 1.15
-            adj['possession'] *= 0.9 
+            adj['tackles_successful'] *= 1.15; adj['possession'] *= 0.9 
             
     elif any(k in style for k in ["Wide Overload", "Twin Striker"]):
-        adj['aerial_duels_won_pct'] = min(80.0, adj['aerial_duels_won_pct'] * 1.25)
-        adj['shots_on_target'] *= 1.15
-        adj['xg'] *= 1.1
+        adj['aerial_duels_won_pct'] = min(80.0, adj['aerial_duels_won_pct'] * 1.25); adj['shots_on_target'] *= 1.15; adj['xg'] *= 1.1
         
     return adj
 
+# Calculate base collision stats
 mapped_stats_base = apply_formation_clash_engine(team_baseline, opp_baseline, home_formation, opp_formation, scenario)
+
+# Fetch available philosophies based on the chosen formation
+available_philosophies = FORMATION_PHILOSOPHIES.get(home_formation, ["Standard (Balanced setup)"])
+
 
 # ---------------------------------------------------------
 # 6. 2D Pitch Rendering Engine
@@ -310,22 +274,13 @@ def draw_2d_pitch_enhanced(formation_name, team_name):
 
 
 # ---------------------------------------------------------
-# 7. Main Dashboard layout (Tabs)
+# 7. MAIN DASHBOARD ROUTING (Replacing Tabs)
 # ---------------------------------------------------------
-tab1, tab2, tab3 = st.tabs([
-    "🏟️ 1. Tactical Board",
-    "⚖️ 2. Manager's A/B Matrix",
-    "📑 3. Executive Brief"
-])
 
-# =========================================================
-# TAB 1: 2D Pitch & Directives
-# =========================================================
-with tab1:
+if app_mode == "🏟️ 1. Tactical Board":
     st.subheader("📋 Matchup & Tactical Execution Board")
     
-    # Philosophy selector restored to Tab 1
-    available_philosophies = FORMATION_PHILOSOPHIES.get(home_formation, ["Standard (Balanced setup)"])
+    # We display the radio buttons for philosophy ONLY when viewing the Tactical Board
     tactical_style = st.radio(
         f"Core Philosophy for {home_formation}",
         available_philosophies,
@@ -336,12 +291,6 @@ with tab1:
     # Calculate final stats using the selected tactical style
     adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
     
-    # Prepare final feature vector for the ML model
-    input_vector = np.array([[
-        adj_stats['xg'], adj_stats['possession'], adj_stats['shots_on_target'], 
-        adj_stats['ppda'], adj_stats['tackles_successful'], adj_stats['interceptions'], adj_stats['aerial_duels_won_pct']
-    ]])
-
     st.divider()
 
     col_pitch, col_panel = st.columns([1.2, 1.0])
@@ -366,10 +315,18 @@ with tab1:
             st.warning(f"**Tempo Control**: Expect to hold approximately **{adj_stats['possession']:.1f}%** possession. Offensive units must secure **{int(adj_stats['shots_on_target'])}** shots on target.")
             st.error(f"**Physicality**: Aerial duels are non-negotiable today. Win rate must stay above **{adj_stats['aerial_duels_won_pct']:.1f}%**.")
 
-# =========================================================
-# TAB 2: A/B Formation Decision Matrix
-# =========================================================
-with tab2:
+
+elif app_mode == "⚖️ 2. Manager's A/B Matrix":
+    
+    # Needs to silently evaluate default philosophy to run simulations properly
+    default_style = available_philosophies[0]
+    adj_stats = apply_tactical_style(mapped_stats_base, default_style)
+    
+    input_vector = np.array([[
+        adj_stats['xg'], adj_stats['possession'], adj_stats['shots_on_target'], 
+        adj_stats['ppda'], adj_stats['tackles_successful'], adj_stats['interceptions'], adj_stats['aerial_duels_won_pct']
+    ]])
+    
     a_min_bounds = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
     a_max_bounds = np.array([10.0, 100.0, 30.0, 50.0, 60.0, 50.0, 100.0])
 
@@ -450,15 +407,27 @@ with tab2:
         k3.metric("Pressing (PPDA)", f"{alt_mapped_styled['ppda']:.1f}", f"{diff_ppda:+.1f}", delta_color="inverse")
         k4.metric("Tackles Won", f"{alt_mapped_styled['tackles_successful']:.1f}", f"{diff_tackles:+.1f}")
 
-# =========================================================
-# TAB 3: Data-Driven Narrative Engine (Executive Brief)
-# =========================================================
-with tab3:
+
+elif app_mode == "📑 3. Executive Brief":
+    
+    # Needs to silently evaluate default philosophy to generate report
+    default_style = available_philosophies[0]
+    adj_stats = apply_tactical_style(mapped_stats_base, default_style)
+    
+    input_vector = np.array([[
+        adj_stats['xg'], adj_stats['possession'], adj_stats['shots_on_target'], 
+        adj_stats['ppda'], adj_stats['tackles_successful'], adj_stats['interceptions'], adj_stats['aerial_duels_won_pct']
+    ]])
+    
+    # We recalculate the basic MC win % strictly for display in the brief
+    classes = list(model.classes_)
+    win_idx = classes.index('Win') if 'Win' in classes else 2
+    mc_win_pct = np.mean(model.predict_proba(input_vector)[:, win_idx]) * 100
+    
     st.subheader("📑 Pre-Match Executive Brief")
     st.caption("Dynamically generated tactical report based on Random Forest feature weights and real-time numerical deviations.")
 
     def get_dynamic_advice(feat, curr_val, base_val, is_advantage, style):
-        """Translates raw mathematical deviations into human-readable coaching intelligence."""
         diff = curr_val - base_val
         abs_diff = abs(diff)
         direction = "higher" if diff > 0 else "lower"
@@ -512,7 +481,7 @@ with tab3:
 
     with st.container(border=True):
         st.markdown(f"### 🏟️ Match Preview: {home_team} vs {away_team}")
-        st.caption(f"**Formation**: {home_formation} | **Style**: {tactical_style.split(' ')[0]} | **Base Win Prob**: {mc_win_pct:.1f}%")
+        st.caption(f"**Formation**: {home_formation} | **Style**: {default_style.split(' ')[0]} | **Base Win Prob**: {mc_win_pct:.1f}%")
         
         col_pos, col_neg = st.columns(2)
         
@@ -521,7 +490,7 @@ with tab3:
             if top_positives:
                 for feat, val, score in top_positives:
                     base_val = team_baseline[feat] 
-                    advice = get_dynamic_advice(feat, val, base_val, True, tactical_style)
+                    advice = get_dynamic_advice(feat, val, base_val, True, default_style)
                     st.success(f"**{feat.upper()}** (Value: `{val:.1f}`)\n\n*Analysis: {advice}*")
             else:
                 st.caption("No distinct statistical advantages found.")
@@ -531,7 +500,7 @@ with tab3:
             if top_negatives:
                 for feat, val, score in top_negatives:
                     base_val = team_baseline[feat] 
-                    advice = get_dynamic_advice(feat, val, base_val, False, tactical_style)
+                    advice = get_dynamic_advice(feat, val, base_val, False, default_style)
                     st.error(f"**{feat.upper()}** (Value: `{val:.1f}`)\n\n*Warning: {advice}*")
             else:
                 st.caption("Risks are currently managed.")
@@ -539,15 +508,15 @@ with tab3:
         st.divider()
         
         report_text = f"""# ⚽ Pre-Match Tactical Sheet: {home_team} vs {away_team}
-- **Starting Formation**: {home_formation} ({tactical_style.split(' ')[0]})
-- **Expected Win Probability**: {mc_win_pct:.1f}% (Confidence Interval: {ci_lower:.1f}% ~ {ci_upper:.1f}%)
+- **Starting Formation**: {home_formation} ({default_style.split(' ')[0]})
+- **Expected Win Probability**: {mc_win_pct:.1f}%
 
 ---
 ### ⚔️ Offensive Directives (Exploit Advantages):
 """
-        report_text += "\n".join([f"- Leverage our **{f.upper()}** dominance (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], True, tactical_style)}" for f, v, s in top_positives]) + "\n\n"
+        report_text += "\n".join([f"- Leverage our **{f.upper()}** dominance (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], True, default_style)}" for f, v, s in top_positives]) + "\n\n"
         report_text += "### 🛡️ Defensive Directives (Mitigate Risks):\n"
-        report_text += "\n".join([f"- Guard against **{f.upper()}** vulnerabilities (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], False, tactical_style)}" for f, v, s in top_negatives])
+        report_text += "\n".join([f"- Guard against **{f.upper()}** vulnerabilities (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], False, default_style)}" for f, v, s in top_negatives])
 
         st.download_button(
             label="📥 Export Markdown Tactical Sheet (For the Captain)",
