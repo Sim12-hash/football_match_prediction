@@ -336,7 +336,7 @@ if app_mode == "🏟️ 1. Tactical Board":
         fig_pitch = draw_2d_pitch_enhanced(home_formation, home_team)
         st.pyplot(fig_pitch)
 
-      st.markdown("##### 📈 Dynamic Impact on Team KPIs")
+        st.markdown("##### 📈 Dynamic Impact on Team KPIs")
         k1, k2, k3, k4 = st.columns(4)
         
         # Added explicit tactical labels and hover tooltips for instant coach comprehension
