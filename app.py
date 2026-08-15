@@ -336,7 +336,8 @@ if app_mode == "🏟️ 1. Tactical Board":
         fig_pitch = draw_2d_pitch_enhanced(home_formation, home_team)
         st.pyplot(fig_pitch)
 
-        st.markdown("##### 📈 Dynamic Impact on Team KPIs")
+        st.markdown("##### 📈 Projected Match KPIs vs. Historical Baseline")
+        st.caption("The colored delta values show the **net tactical gain/loss** compared to your team's usual historical average. Coach, use this to see if your tactic is actually improving the team or hurting it.")
         k1, k2, k3, k4 = st.columns(4)
         
         # Added explicit tactical labels and hover tooltips for instant coach comprehension
@@ -575,9 +576,4 @@ elif app_mode == "📑 3. Executive Brief":
         report_text += "### 🛡️ Defensive Directives (Mitigate Risks):\n"
         report_text += "\n".join([f"- Guard against **{f.upper()}** vulnerabilities (Current: {v:.1f}). Execution: {get_dynamic_advice(f, v, team_baseline[f], False, tactical_style)}" for f, v, s in top_negatives])
 
-        st.download_button(
-            label="📥 Export Markdown Tactical Sheet (For the Captain)",
-            data=report_text,
-            file_name=f"Tactical_Sheet_{home_team}_vs_{away_team}.md",
-            mime="text/markdown"
-        )
+       
