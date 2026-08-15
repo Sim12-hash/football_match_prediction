@@ -161,8 +161,30 @@ app_mode = st.sidebar.radio(
 )
 
 # ---------------------------------------------------------
+# ---------------------------------------------------------
 # 5. Tactical Engine & Style Modifiers
 # ---------------------------------------------------------
+
+# 🛡️ THE FIX: Real-world Statistical Boundaries (Anti-Inflation Lock)
+# Ensures our tactical modifiers never push data out of the Random Forest's trained distribution.
+STAT_LIMITS = {
+    'xg': (0.1, 3.8),                    # xG rarely exceeds 3.8 in a 90-minute game
+    'possession': (20.0, 80.0),          # Possession realistically stays within 20% to 80%
+    'shots_on_target': (0.0, 15.0),      # Absolute cap on realistic shots on target
+    'ppda': (4.0, 25.0),                 # 4.0 is extreme pressing, 25.0 is completely passive
+    'tackles_successful': (2.0, 35.0),   
+    'interceptions': (1.0, 30.0),
+    'aerial_duels_won_pct': (15.0, 85.0) # Win rates rarely hit absolute 0% or 100%
+}
+
+def enforce_realistic_bounds(stats_dict):
+    """Clips inflated metrics back into realistic historical distributions."""
+    bounded = stats_dict.copy()
+    for feat, (min_val, max_val) in STAT_LIMITS.items():
+        if feat in bounded:
+            bounded[feat] = max(min_val, min(max_val, bounded[feat]))
+    return bounded
+
 def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
     mapped = home_base.copy()
     
@@ -196,7 +218,8 @@ def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
     elif scenario == "Leading - Park the Bus":
         mapped['possession'] = 33.0; mapped['ppda'] = 20.0; mapped['xg'] *= 0.6; mapped['shots_on_target'] *= 0.6
 
-    return mapped
+    # Return the bounded results
+    return enforce_realistic_bounds(mapped)
 
 def apply_tactical_style(stats_dict, style):
     adj = stats_dict.copy()
@@ -221,7 +244,8 @@ def apply_tactical_style(stats_dict, style):
     elif any(k in style for k in ["Wide Overload", "Twin Striker"]):
         adj['aerial_duels_won_pct'] = min(80.0, adj['aerial_duels_won_pct'] * 1.25); adj['shots_on_target'] *= 1.15; adj['xg'] *= 1.1
         
-    return adj
+    # Return the bounded results
+    return enforce_realistic_bounds(adj)
 
 # Calculate base collision stats
 mapped_stats_base = apply_formation_clash_engine(team_baseline, opp_baseline, home_formation, opp_formation, scenario)
