@@ -99,17 +99,8 @@ FORMATION_PHILOSOPHIES = {
 }
 
 # ---------------------------------------------------------
-# 4. FIXED SIDEBAR NAVIGATION & SETTINGS
+# 4. SIDEBAR CONFIGURATION (Optimized UX Flow)
 # ---------------------------------------------------------
-# THE FIX: Using a sidebar radio button instead of Streamlit Tabs. 
-# The sidebar is natively sticky and never scrolls out of view!
-st.sidebar.header("🧭 Dashboard Navigation")
-app_mode = st.sidebar.radio(
-    "Select View:",
-    ["🏟️ 1. Tactical Board", "⚖️ 2. Manager's A/B Matrix", "📑 3. Executive Brief"]
-)
-
-st.sidebar.markdown("---")
 st.sidebar.header("⚙️ 1. Matchup Configuration")
 
 all_teams = sorted(set(df_raw['home_team'].unique().tolist() + df_raw['away_team'].unique().tolist()))
@@ -159,6 +150,15 @@ opp_formation = st.sidebar.selectbox("Opponent Formation", formation_list, index
 st.sidebar.markdown("---")
 st.sidebar.header("🎯 3. Match Scenarios")
 scenario = st.sidebar.radio("Current Game State", ["Balanced Start (0-0)", "Trailing - Press All Out", "Leading - Park the Bus"], index=0)
+
+# ✨ THE UX FIX: Navigation dynamically rests at the bottom as the final action step
+st.sidebar.markdown("---")
+st.sidebar.header("🧭 4. Dashboard View")
+app_mode = st.sidebar.radio(
+    "Select output panel:",
+    ["🏟️ 1. Tactical Board", "⚖️ 2. Manager's A/B Matrix", "📑 3. Executive Brief"],
+    index=0
+)
 
 # ---------------------------------------------------------
 # 5. Tactical Engine & Style Modifiers
