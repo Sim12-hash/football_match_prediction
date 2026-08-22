@@ -76,27 +76,45 @@ def calculate_global_baselines(df):
 FEATURE_BASELINES = calculate_global_baselines(df_raw)
 
 # ---------------------------------------------------------
-# 3. Tactical Dictionaries
+# 3. Tactical Configuration Engine
 # ---------------------------------------------------------
-FORMATION_TACTICS = {
-    "4-3-3": {"style": "High Press", "color": "#FF0055", "line_x": 68, "label": "🔥 HIGH PRESS LINE"},
-    "4-2-3-1": {"style": "Balanced", "color": "#FACC15", "line_x": 55, "label": "⚖️ BALANCED LINE"},
-    "3-5-2": {"style": "Midfield Control", "color": "#00FF87", "line_x": 50, "label": "🔄 MIDFIELD CONTROL"},
-    "4-4-2": {"style": "Counter Attack", "color": "#38BDF8", "line_x": 40, "label": "⚡ COUNTER LINE"},
-    "5-4-1": {"style": "Low Block", "color": "#3b82f6", "line_x": 25, "label": "🛡️ LOW BLOCK LINE"},
-    "3-4-3": {"style": "Wide Overload", "color": "#a855f7", "line_x": 65, "label": "⚔️ WIDE OVERLOAD"},
-    "4-1-4-1": {"style": "Delay & Block", "color": "#6366f1", "line_x": 45, "label": "🛑 DELAY & BLOCK"}
+# Maps team formations and tactical philosophies to specific pitch 
+# coordinates (X-axis depth: 0-100) and line markers for the 2D UI rendering.
+TACTICAL_CONFIG = {
+    "4-3-3": {
+        "High Block Possession (Default)": {"color": "#FF0055", "line_x": 75, "label": "🔥 HIGH PRESS LINE"},
+        "Gegenpressing (High Intensity)": {"color": "#FF0055", "line_x": 88, "label": "🌪️ GEGENPRESS LINE"},
+        "Wide Overload & Crossing": {"color": "#a855f7", "line_x": 65, "label": "⚔️ OVERLOAD LINE"}
+    },
+    "4-2-3-1": {
+        "Balanced Double Pivot (Default)": {"color": "#FACC15", "line_x": 55, "label": "⚖️ BALANCED LINE"},
+        "Fast Counter-Attack": {"color": "#38BDF8", "line_x": 35, "label": "⚡ RETREAT LINE"},
+        "Playmaker Central Penetration": {"color": "#00FF87", "line_x": 75, "label": "🎯 PENETRATION LINE"}
+    },
+    "3-5-2": {
+        "Balanced Attack/Defense (Default)": {"color": "#00FF87", "line_x": 58, "label": "🔄 MIDFIELD CONTROL LINE"},
+        "Twin Striker Aerial Target": {"color": "#f97316", "line_x": 80, "label": "🦅 TARGET ZONE LINE"}
+    },
+    "4-4-2": {
+        "Fast Counter-Attack (Default)": {"color": "#38BDF8", "line_x": 45, "label": "⚡ COUNTER LINE"},
+        "Full-Pitch High Press": {"color": "#FF0055", "line_x": 82, "label": "🔥 HIGH PRESS LINE"}
+    },
+    "5-4-1": {
+        "Park the Bus (Default)": {"color": "#3b82f6", "line_x": 28, "label": "🛡️ LOW BLOCK LINE"},
+        "Long Ball to Target Man": {"color": "#eab308", "line_x": 68, "label": "🚀 LONG BALL OUTLET LINE"}
+    },
+    "3-4-3": {
+        "All-Out Attack (Default)": {"color": "#FF0055", "line_x": 78, "label": "⚔️ WIDE OVERLOAD LINE"},
+        "High Press Man-to-Man": {"color": "#ef4444", "line_x": 88, "label": "🥊 MAN-TO-MAN PRESS LINE"}
+    },
+    "4-1-4-1": {
+        "Midfield Chokehold (Default)": {"color": "#6366f1", "line_x": 58, "label": "🛑 DELAY & BLOCK LINE"},
+        "Mid-Block Press": {"color": "#f59e0b", "line_x": 68, "label": "🚧 MID-BLOCK PRESS LINE"}
+    }
 }
 
-FORMATION_PHILOSOPHIES = {
-    "4-3-3": ["High Block Possession (Default)", "Gegenpressing (High Intensity)", "Wide Overload & Crossing"],
-    "4-1-4-1": ["Midfield Chokehold (Default)", "Mid-Block Press"],
-    "4-2-3-1": ["Balanced Double Pivot (Default)", "Fast Counter-Attack", "Playmaker Central Penetration"],
-    "3-4-3": ["All-Out Attack (Default)", "High Press Man-to-Man"],
-    "3-5-2": ["Balanced Attack/Defense (Default)", "Twin Striker Aerial Target"],
-    "4-4-2": ["Fast Counter-Attack (Default)", "Full-Pitch High Press"],
-    "5-4-1": ["Park the Bus (Default)", "Long Ball to Target Man"]
-}
+# Dynamically extract philosophy options to populate the sidebar UI
+FORMATION_PHILOSOPHIES = {k: list(v.keys()) for k, v in TACTICAL_CONFIG.items()}
 
 # ---------------------------------------------------------
 # 4. SIDEBAR CONFIGURATION (Optimized UX Flow)
@@ -255,19 +273,23 @@ available_philosophies = FORMATION_PHILOSOPHIES.get(home_formation, ["Standard (
 
 
 # ---------------------------------------------------------
-# 6. 2D Pitch Rendering Engine
+# 6. 2D Pitch Rendering Component
 # ---------------------------------------------------------
-def draw_2d_pitch_enhanced(formation_name, team_name):
+def draw_2d_pitch_enhanced(formation_name, team_name, philosophy_name):
     fig, ax = plt.subplots(figsize=(6, 4.2), facecolor='#0b0f19')
     ax.set_facecolor('#1e293b')
 
+    # Render fundamental pitch boundaries and zones
     ax.plot([0, 0, 100, 100, 0], [0, 100, 100, 0, 0], color="white", alpha=0.3, linewidth=1.5)
     ax.plot([50, 50], [0, 100], color="white", alpha=0.3, linewidth=1.5)
     ax.add_patch(patches.Circle((50, 50), 12, color="white", fill=False, alpha=0.3, linewidth=1.5))
     ax.add_patch(patches.Rectangle((0, 20), 18, 60, color="white", fill=False, alpha=0.3, linewidth=1.5))
     ax.add_patch(patches.Rectangle((82, 20), 18, 60, color="white", fill=False, alpha=0.3, linewidth=1.5))
 
-    tactic_info = FORMATION_TACTICS[formation_name]
+    # Fetch corresponding tactical depth configuration based on user selection
+    tactic_info = TACTICAL_CONFIG[formation_name].get(philosophy_name, list(TACTICAL_CONFIG[formation_name].values())[0])
+    
+    # Overlay tactical defensive/offensive indicator line
     ax.axvline(x=tactic_info["line_x"], color=tactic_info["color"], linestyle='--', linewidth=2, alpha=0.8)
     ax.text(tactic_info["line_x"] + 1, 92, tactic_info["label"], color=tactic_info["color"], fontsize=8, fontweight='bold')
 
@@ -292,7 +314,10 @@ def draw_2d_pitch_enhanced(formation_name, team_name):
     ax.set_xlim(-2, 102)
     ax.set_ylim(-2, 102)
     ax.axis('off')
-    ax.set_title(f"{team_name} [{formation_name} | {tactic_info['style']}]", color='white', fontsize=11, pad=10)
+    
+    # Format header title by trimming default suffix
+    clean_philosophy = philosophy_name.replace(" (Default)", "")
+    ax.set_title(f"{team_name} [{formation_name} | {clean_philosophy}]", color='white', fontsize=11, pad=10)
     plt.tight_layout()
     return fig
 
@@ -331,9 +356,10 @@ if app_mode == "🏟️ 1. Tactical Board":
 
     col_pitch, col_panel = st.columns([1.2, 1.0])
 
-    with col_pitch:
+   with col_pitch:
         st.markdown("##### 🏟️ Formation Clash & Defensive Line")
-        fig_pitch = draw_2d_pitch_enhanced(home_formation, home_team)
+        # Inject tactical_style parameter to execute dynamic line rendering
+        fig_pitch = draw_2d_pitch_enhanced(home_formation, home_team, tactical_style)
         st.pyplot(fig_pitch)
 
         st.markdown("##### 📈 Projected Match KPIs vs. Historical Baseline")
