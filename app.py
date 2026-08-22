@@ -161,7 +161,7 @@ opp_baseline = get_team_baseline(away_data, away_team, FEATURE_BASELINES)
 
 st.sidebar.markdown("---")
 st.sidebar.header("📐 2. Formation")
-formation_list = list(FORMATION_TACTICS.keys())
+formation_list = list(TACTICAL_CONFIG.keys())
 home_formation = st.sidebar.selectbox("Our Formation", formation_list, index=0)
 opp_formation = st.sidebar.selectbox("Opponent Formation", formation_list, index=1)
 
