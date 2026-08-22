@@ -356,7 +356,7 @@ if app_mode == "🏟️ 1. Tactical Board":
 
     col_pitch, col_panel = st.columns([1.2, 1.0])
 
-   with col_pitch:
+    with col_pitch:
         st.markdown("##### 🏟️ Formation Clash & Defensive Line")
         # Inject tactical_style parameter to execute dynamic line rendering
         fig_pitch = draw_2d_pitch_enhanced(home_formation, home_team, tactical_style)
