@@ -82,34 +82,34 @@ FEATURE_BASELINES = calculate_global_baselines(df_raw)
 # coordinates (X-axis depth: 0-100) and line markers for the 2D UI rendering.
 TACTICAL_CONFIG = {
     "4-3-3": {
-        "High Block Possession (Default)": {"color": "#FF0055", "line_x": 75, "label": "🔥 HIGH PRESS LINE"},
-        "Gegenpressing (High Intensity)": {"color": "#FF0055", "line_x": 88, "label": "🌪️ GEGENPRESS LINE"},
-        "Wide Overload & Crossing": {"color": "#a855f7", "line_x": 65, "label": "⚔️ OVERLOAD LINE"}
+        "High Block Possession (Default)": {"color": "#FF0055", "line_x": 75, "label": " HIGH PRESS LINE"},
+        "Gegenpressing (High Intensity)": {"color": "#FF0055", "line_x": 88, "label": " GEGENPRESS LINE"},
+        "Wide Overload & Crossing": {"color": "#a855f7", "line_x": 65, "label": " OVERLOAD LINE"}
     },
     "4-2-3-1": {
-        "Balanced Double Pivot (Default)": {"color": "#FACC15", "line_x": 55, "label": "⚖️ BALANCED LINE"},
-        "Fast Counter-Attack": {"color": "#38BDF8", "line_x": 35, "label": "⚡ RETREAT LINE"},
-        "Playmaker Central Penetration": {"color": "#00FF87", "line_x": 75, "label": "🎯 PENETRATION LINE"}
+        "Balanced Double Pivot (Default)": {"color": "#FACC15", "line_x": 55, "label": " BALANCED LINE"},
+        "Fast Counter-Attack": {"color": "#38BDF8", "line_x": 35, "label": " RETREAT LINE"},
+        "Playmaker Central Penetration": {"color": "#00FF87", "line_x": 75, "label": " PENETRATION LINE"}
     },
     "3-5-2": {
-        "Balanced Attack/Defense (Default)": {"color": "#00FF87", "line_x": 58, "label": "🔄 MIDFIELD CONTROL LINE"},
-        "Twin Striker Aerial Target": {"color": "#f97316", "line_x": 80, "label": "🦅 TARGET ZONE LINE"}
+        "Balanced Attack/Defense (Default)": {"color": "#00FF87", "line_x": 58, "label": " MIDFIELD CONTROL LINE"},
+        "Twin Striker Aerial Target": {"color": "#f97316", "line_x": 80, "label": " TARGET ZONE LINE"}
     },
     "4-4-2": {
-        "Fast Counter-Attack (Default)": {"color": "#38BDF8", "line_x": 45, "label": "⚡ COUNTER LINE"},
-        "Full-Pitch High Press": {"color": "#FF0055", "line_x": 82, "label": "🔥 HIGH PRESS LINE"}
+        "Fast Counter-Attack (Default)": {"color": "#38BDF8", "line_x": 45, "label": " COUNTER LINE"},
+        "Full-Pitch High Press": {"color": "#FF0055", "line_x": 82, "label": " HIGH PRESS LINE"}
     },
     "5-4-1": {
-        "Park the Bus (Default)": {"color": "#3b82f6", "line_x": 28, "label": "🛡️ LOW BLOCK LINE"},
-        "Long Ball to Target Man": {"color": "#eab308", "line_x": 68, "label": "🚀 LONG BALL OUTLET LINE"}
+        "Park the Bus (Default)": {"color": "#3b82f6", "line_x": 28, "label": " LOW BLOCK LINE"},
+        "Long Ball to Target Man": {"color": "#eab308", "line_x": 68, "label": " LONG BALL OUTLET LINE"}
     },
     "3-4-3": {
-        "All-Out Attack (Default)": {"color": "#FF0055", "line_x": 78, "label": "⚔️ WIDE OVERLOAD LINE"},
-        "High Press Man-to-Man": {"color": "#ef4444", "line_x": 88, "label": "🥊 MAN-TO-MAN PRESS LINE"}
+        "All-Out Attack (Default)": {"color": "#FF0055", "line_x": 78, "label": " WIDE OVERLOAD LINE"},
+        "High Press Man-to-Man": {"color": "#ef4444", "line_x": 88, "label": " MAN-TO-MAN PRESS LINE"}
     },
     "4-1-4-1": {
-        "Midfield Chokehold (Default)": {"color": "#6366f1", "line_x": 58, "label": "🛑 DELAY & BLOCK LINE"},
-        "Mid-Block Press": {"color": "#f59e0b", "line_x": 68, "label": "🚧 MID-BLOCK PRESS LINE"}
+        "Midfield Chokehold (Default)": {"color": "#6366f1", "line_x": 58, "label": " DELAY & BLOCK LINE"},
+        "Mid-Block Press": {"color": "#f59e0b", "line_x": 68, "label": " MID-BLOCK PRESS LINE"}
     }
 }
 
