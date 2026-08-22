@@ -321,35 +321,22 @@ def draw_2d_pitch_enhanced(formation_name, team_name, philosophy_name):
     plt.tight_layout()
     return fig
 
-# ---------------------------------------------------------
-# 7. MAIN DASHBOARD ROUTING (With Session State Memory)
-# ---------------------------------------------------------
-
-# ✨ THE FIX: Session State to remember the coach's philosophy across pages
-if 'current_formation' not in st.session_state or st.session_state.current_formation != home_formation:
-    st.session_state.current_formation = home_formation
+# Validate session state to ensure selected philosophy exists within current formation options
+if 'selected_philosophy' not in st.session_state or st.session_state.selected_philosophy not in available_philosophies:
     st.session_state.selected_philosophy = available_philosophies[0]
 
 if app_mode == "🏟️ 1. Tactical Board":
     st.subheader("📋 Matchup & Tactical Execution Board")
     
-    # Attempt to find the index of the previously selected philosophy
-    try:
-        current_idx = available_philosophies.index(st.session_state.selected_philosophy)
-    except ValueError:
-        current_idx = 0
-        
+    # Direct state binding via key eliminates UI lag and double-click stutter
     tactical_style = st.radio(
         f"Core Philosophy for {home_formation}",
         available_philosophies,
-        index=current_idx,
+        key="selected_philosophy",
         horizontal=True
     )
     
-    # Save the current selection immediately to memory
-    st.session_state.selected_philosophy = tactical_style
-    
-    # Calculate final stats using the selected tactical style
+    # Calculate final stats using the actively selected tactical style
     adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
     
     st.divider()
@@ -358,7 +345,6 @@ if app_mode == "🏟️ 1. Tactical Board":
 
     with col_pitch:
         st.markdown("##### 🏟️ Formation Clash & Defensive Line")
-        # Inject tactical_style parameter to execute dynamic line rendering
         fig_pitch = draw_2d_pitch_enhanced(home_formation, home_team, tactical_style)
         st.pyplot(fig_pitch)
 
@@ -366,7 +352,6 @@ if app_mode == "🏟️ 1. Tactical Board":
         st.caption("The colored delta values show the **net tactical gain/loss** compared to your team's usual historical average. Coach, use this to see if your tactic is actually improving the team or hurting it.")
         k1, k2, k3, k4 = st.columns(4)
         
-        # Added explicit tactical labels and hover tooltips for instant coach comprehension
         k1.metric(
             label="🎯 xG (Scoring Threat)", 
             value=f"{adj_stats['xg']:.2f}", 
@@ -383,7 +368,7 @@ if app_mode == "🏟️ 1. Tactical Board":
             label="🏃 PPDA (Pressing Intensity)", 
             value=f"{adj_stats['ppda']:.1f}", 
             delta=f"{adj_stats['ppda'] - team_baseline['ppda']:+.1f}", 
-            delta_color="inverse", # Lower PPDA is historically better (more aggressive)
+            delta_color="inverse",
             help="Passes Allowed Per Defensive Action. LOWER value = Fiercer, more aggressive high press."
         )
         k4.metric(
