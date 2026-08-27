@@ -406,7 +406,7 @@ elif app_mode == "⚖️ 2. Manager's A/B Matrix":
     for f in tactical_features
 ])
 
-a_max_bounds = np.array([
+    a_max_bounds = np.array([
     STAT_LIMITS[f][1]
     for f in tactical_features
 ])
