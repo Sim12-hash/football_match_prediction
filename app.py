@@ -471,9 +471,9 @@ elif app_mode == "⚖️ 2. Manager's A/B Matrix":
             if diff_win > 3.0:
                 st.success(f"💡 **Coaching Staff Advice**: Under the current scenario assumptions, "f"switching to **{alt_formation}** increases the model-estimated win "f"probability by **{diff_win:+.1f} percentage points** compared with Plan A.")
             elif diff_win < -2.0:
-                st.error(f"⚠️ **High-Risk Warning**: Switching to **{alt_formation}** drops win rate to **{alt_win_pct:.1f}%**. The opponent counters this setup heavily. Avoid.")
+                st.error(f"⚠️ **Scenario Warning**: Under the current assumptions, switching to " f"**{alt_formation}** reduces the model-estimated win probability to "f"**{alt_win_pct:.1f}%**, a change of **{diff_win:.1f} percentage points** "f"relative to Plan A.")
             else:
-                st.info(f"⚖️ **Tactical Assessment**: Changing to **{alt_formation}** yields a **{diff_win:+.1f}%** shift. Marginal impact; rely on player execution and in-game tweaks.")
+                st.info(f"⚖️ **Tactical Assessment**: Switching to **{alt_formation}** changes the "f"model-estimated win probability by **{diff_win:+.1f} percentage points**. "f"The estimated difference between the two scenarios is relatively small.")
 
         st.markdown("##### 📊 Tactical Cost & Benefit of Formation Change (KPI Delta)")
         k1, k2, k3, k4 = st.columns(4)
