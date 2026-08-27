@@ -183,16 +183,19 @@ app_mode = st.sidebar.radio(
 # 5. Tactical Engine & Style Modifiers
 # ---------------------------------------------------------
 
-# 🛡️ THE FIX: Real-world Statistical Boundaries (Anti-Inflation Lock)
-# Ensures our tactical modifiers never push data out of the Random Forest's trained distribution.
+@st.cache_data
+def load_feature_reference():
+    return pd.read_csv("clean_master_dataset.csv")
+
+
+feature_reference = load_feature_reference()
+
 STAT_LIMITS = {
-    'xg': (0.1, 3.8),                    # xG rarely exceeds 3.8 in a 90-minute game
-    'possession': (20.0, 80.0),          # Possession realistically stays within 20% to 80%
-    'shots_on_target': (0.0, 15.0),      # Absolute cap on realistic shots on target
-    'ppda': (4.0, 25.0),                 # 4.0 is extreme pressing, 25.0 is completely passive
-    'tackles_successful': (2.0, 35.0),   
-    'interceptions': (1.0, 30.0),
-    'aerial_duels_won_pct': (15.0, 85.0) # Win rates rarely hit absolute 0% or 100%
+    feat: (
+        float(feature_reference[feat].min()),
+        float(feature_reference[feat].max())
+    )
+    for feat in tactical_features
 }
 
 def enforce_realistic_bounds(stats_dict):
@@ -398,9 +401,15 @@ elif app_mode == "⚖️ 2. Manager's A/B Matrix":
         adj_stats['ppda'], adj_stats['tackles_successful'], adj_stats['interceptions'], adj_stats['aerial_duels_won_pct']
     ]])
     
-    a_min_bounds = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
-    a_max_bounds = np.array([10.0, 100.0, 30.0, 50.0, 60.0, 50.0, 100.0])
+    a_min_bounds = np.array([
+    STAT_LIMITS[f][0]
+    for f in tactical_features
+])
 
+a_max_bounds = np.array([
+    STAT_LIMITS[f][1]
+    for f in tactical_features
+])
     N_SIM = 1000
     np.random.seed(42)
     noise = np.random.normal(0, 1, (N_SIM, 7))
@@ -422,8 +431,9 @@ elif app_mode == "⚖️ 2. Manager's A/B Matrix":
     ci_lower = np.percentile(win_probs_series, 2.5) * 100
     ci_upper = np.percentile(win_probs_series, 97.5) * 100
 
-    st.subheader("⚖️ Tactical Core: A/B Formation ROI & KPI Cost")
-    st.caption("Evaluate the true probability impacts of your tactical setup. Pure, data-driven insights.")
+    st.subheader("⚖️ Tactical Core: A/B Formation Comparison & KPI Trade-offs")
+    st.caption("Compare model-estimated outcome probabilities under alternative "
+    "tactical scenarios.")
 
     m1, m2, m3 = st.columns(3)
     with m1:
@@ -459,7 +469,7 @@ elif app_mode == "⚖️ 2. Manager's A/B Matrix":
 
         with col_advice:
             if diff_win > 3.0:
-                st.success(f"💡 **Coaching Staff Advice**: Switching to **{alt_formation}** boosts expected win rate by **+{diff_win:.1f}%**! Highly recommended due to a strong tactical mismatch.")
+                st.success(f"💡 **Coaching Staff Advice**: Under the current scenario assumptions, "f"switching to **{alt_formation}** increases the model-estimated win "f"probability by **{diff_win:+.1f} percentage points** compared with Plan A.")
             elif diff_win < -2.0:
                 st.error(f"⚠️ **High-Risk Warning**: Switching to **{alt_formation}** drops win rate to **{alt_win_pct:.1f}%**. The opponent counters this setup heavily. Avoid.")
             else:
@@ -500,7 +510,8 @@ elif app_mode == "📑 3. Executive Brief":
     mc_win_pct = np.mean(model.predict_proba(input_vector)[:, win_idx]) * 100
     
     st.subheader("📑 Pre-Match Executive Brief")
-    st.caption("Dynamically generated tactical report based on Random Forest feature weights and real-time numerical deviations.")
+    st.caption("Scenario summary based on global Random Forest feature importance, ""scenario-specific deviations from the historical baseline, and ""predefined tactical rules.")
+    st.caption( "This module is not a local explanation of an individual model prediction.")
 
     def get_dynamic_advice(feat, curr_val, base_val, is_advantage, style):
         """
