@@ -848,17 +848,17 @@ elif app_mode == "📊 4. Model Comparison":
 
         with st.expander("ℹ️ What exactly is being compared?"):
 
-        st.markdown(
-            """
-            - **Formation is not a direct machine-learning feature.**
-            - The selected formation, opponent formation, match scenario and
-              tactical philosophy first modify the team's historical baseline
-              through predefined scenario rules.
-            - This produces the same seven numerical inputs for all three models.
-            - The three models then independently estimate Win, Draw and Loss
-              probabilities from that identical scenario.
-            """
-        )
+            st.markdown(
+                """
+                - **Formation is not a direct machine-learning feature.**
+                - The selected formation, opponent formation, match scenario and
+                  tactical philosophy first modify the team's historical baseline
+                  through predefined scenario rules.
+                - This produces the same seven numerical inputs for all three models.
+                - The three models then independently estimate Win, Draw and Loss
+                  probabilities from that identical scenario.
+                """
+            )
         # -------------------------------------------------
         # Retrieve current tactical setup
         # -------------------------------------------------
