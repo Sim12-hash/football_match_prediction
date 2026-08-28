@@ -696,7 +696,7 @@ elif app_mode == "📊 4. Model Comparison":
     )
 
 
-   st.success(
+    st.success(
         "🏆 **Selected Final Model: Random Forest** — "
         "Random Forest achieved the highest mean Accuracy (54.78%), "
         "the highest Macro Precision (0.6052), and the lowest Accuracy "
