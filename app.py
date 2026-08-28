@@ -213,7 +213,7 @@ st.sidebar.markdown("---")
 st.sidebar.header("🧭 4. Dashboard View")
 app_mode = st.sidebar.radio(
     "Select output panel:",
-    ["🏟️ 1. Tactical Board", "⚖️ 2. Manager's A/B Matrix", "📑 3. Executive Brief"， "📊 4. Model Comparison"],
+    ["🏟️ 1. Tactical Board", "⚖️ 2. Manager's A/B Matrix", "📑 3. Executive Brief", "📊 4. Model Comparison"],
     index=0
 )
 
