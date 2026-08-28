@@ -363,20 +363,51 @@ def draw_2d_pitch_enhanced(formation_name, team_name, philosophy_name):
     plt.tight_layout()
     return fig
 
-# Validate session state to ensure selected philosophy exists within current formation options
-if 'selected_philosophy' not in st.session_state or st.session_state.selected_philosophy not in available_philosophies:
-    st.session_state.selected_philosophy = available_philosophies[0]
+# ---------------------------------------------------------
+# Persistent Tactical Philosophy State
+# ---------------------------------------------------------
+
+# This value is NOT tied directly to a widget.
+# Therefore it survives when the Tactical Board is not displayed.
+if "selected_philosophy_value" not in st.session_state:
+    st.session_state.selected_philosophy_value = available_philosophies[0]
+
+# If the coach changes formation, make sure the previously
+# selected philosophy is still valid for the new formation.
+if st.session_state.selected_philosophy_value not in available_philosophies:
+    st.session_state.selected_philosophy_value = available_philosophies[0]
+
+
+def save_philosophy_selection():
+    """
+    Copy the temporary radio-widget value into a permanent
+    session-state variable.
+    """
+    st.session_state.selected_philosophy_value = (
+        st.session_state._philosophy_widget
+    )
+
 
 if app_mode == "🏟️ 1. Tactical Board":
+
     st.subheader("📋 Matchup & Tactical Execution Board")
-    
-    # Direct state binding via key eliminates UI lag and double-click stutter
+
+    # Restore the last saved philosophy whenever this
+    # dashboard panel is opened again.
+    st.session_state._philosophy_widget = (
+        st.session_state.selected_philosophy_value
+    )
+
     tactical_style = st.radio(
         f"Core Philosophy for {home_formation}",
         available_philosophies,
-        key="selected_philosophy",
+        key="_philosophy_widget",
+        on_change=save_philosophy_selection,
         horizontal=True
     )
+
+    # Keep the permanent state synchronized.
+    st.session_state.selected_philosophy_value = tactical_style
     
     # Calculate final stats using the actively selected tactical style
     adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
@@ -432,7 +463,7 @@ if app_mode == "🏟️ 1. Tactical Board":
 elif app_mode == "⚖️ 2. Manager's A/B Matrix":
     
     # Fetch the exact tactical style chosen by the coach in Tab 1 from memory
-    tactical_style = st.session_state.selected_philosophy
+    tactical_style = st.session_state.selected_philosophy_value
     adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
     
     input_vector = np.array([[
@@ -531,7 +562,7 @@ elif app_mode == "📑 3. Executive Brief":
     
     # Retrieve the exact tactical philosophy the manager selected in Tab 1 from our session memory, 
     # ensuring absolute continuity across the dashboard.
-    tactical_style = st.session_state.selected_philosophy
+    tactical_style = st.session_state.selected_philosophy_value
     
     # Re-evaluate the baseline collision stats using the manager's chosen philosophy.
     adj_stats = apply_tactical_style(mapped_stats_base, tactical_style)
@@ -665,13 +696,17 @@ elif app_mode == "📊 4. Model Comparison":
     )
 
 
-    st.success(
-        "🏆 **Selected Final Model: Random Forest** — "
-        "selected based on competitive predictive "
-        "performance, relatively stable cross-validation "
-        "behaviour, and support for global feature "
-        "importance in the tactical prototype."
-    )
+   st.success(
+    "🏆 **Selected Final Model: Random Forest** — "
+    "Random Forest achieved the highest mean Accuracy (54.78%), "
+    "the highest Macro Precision (0.6052), and the lowest Accuracy "
+    "variation (SD = 0.0522) during development-stage grouped "
+    "cross-validation. Although MLP and XGBoost achieved marginally "
+    "higher Macro F1-Scores (0.5162 vs. 0.5155), the difference was "
+    "very small. Random Forest was retained because of its competitive "
+    "overall performance and its direct support for the global "
+    "feature-importance mechanism used by the prototype."
+)
 
 
     # =====================================================
@@ -803,19 +838,32 @@ elif app_mode == "📊 4. Model Comparison":
         )
 
         st.caption(
-            "All three models receive exactly the same "
-            "scenario-adjusted seven-feature input and "
-            "the same Monte Carlo perturbations."
+            "The live comparison below uses deployment versions of Random Forest, "
+            "MLP and XGBoost trained on the available historical dataset. All three "
+            "receive exactly the same scenario-adjusted seven-feature input and the "
+            "same Monte Carlo perturbations. These live outputs are for tactical "
+            "scenario comparison and are separate from the development-stage "
+            "cross-validation metrics shown above."
         )
 
+        with st.expander("ℹ️ What exactly is being compared?"):
 
+        st.markdown(
+            """
+            - **Formation is not a direct machine-learning feature.**
+            - The selected formation, opponent formation, match scenario and
+              tactical philosophy first modify the team's historical baseline
+              through predefined scenario rules.
+            - This produces the same seven numerical inputs for all three models.
+            - The three models then independently estimate Win, Draw and Loss
+              probabilities from that identical scenario.
+            """
+        )
         # -------------------------------------------------
         # Retrieve current tactical setup
         # -------------------------------------------------
 
-        tactical_style = (
-            st.session_state.selected_philosophy
-        )
+        tactical_style = st.session_state.selected_philosophy_value
 
         comparison_stats = apply_tactical_style(
             mapped_stats_base,
@@ -1064,22 +1112,19 @@ elif app_mode == "📊 4. Model Comparison":
 
         c1, c2, c3 = st.columns(3)
 
-        c1.metric(
+       c1.metric(
             "🌲 Random Forest",
-            rf_top,
-            f"{rf_probability[rf_top] * 100:.1f}%"
+            f"{rf_top} — {rf_probability[rf_top] * 100:.1f}%"
         )
 
         c2.metric(
             "🧠 MLP",
-            mlp_top,
-            f"{mlp_probability[mlp_top] * 100:.1f}%"
-        )
+            f"{mlp_top} — {mlp_probability[mlp_top] * 100:.1f}%"
+        )    
 
         c3.metric(
             "🚀 XGBoost",
-            xgb_top,
-            f"{xgb_probability[xgb_top] * 100:.1f}%"
+            f"{xgb_top} — {xgb_probability[xgb_top] * 100:.1f}%"
         )
 
 
@@ -1098,9 +1143,7 @@ elif app_mode == "📊 4. Model Comparison":
         else:
 
             st.warning(
-                "⚠️ The three models do not fully agree "
-                "on the most likely outcome. This "
-                "demonstrates model uncertainty and shows "
-                "why comparing multiple supervised "
-                "learning approaches is useful."
+                "ℹ️ The displayed Win, Draw and Loss percentages are "
+                "**model-estimated probabilities**, not calibrated probabilities. "
+                "No separate probability-calibration method was applied."
             )
