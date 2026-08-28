@@ -41,13 +41,52 @@ def load_datasets():
 
 @st.cache_resource
 def load_model():
-    return joblib.load('world_cup_rf_model_v2.pkl')
+    return joblib.load(
+        'world_cup_rf_model_v2.pkl'
+    )
+
+
+@st.cache_resource
+def load_comparison_models():
+    return joblib.load(
+        'comparison_models.pkl'
+    )
+
 
 try:
+    # Dataset
     df_raw = load_datasets()
+
+    # Main selected model
     model = load_model()
+
+    # Other two models + metrics
+    comparison_bundle = load_comparison_models()
+
+    mlp_model = comparison_bundle[
+        "mlp_model"
+    ]
+
+    xgb_model = comparison_bundle[
+        "xgb_model"
+    ]
+
+    xgb_classes = comparison_bundle[
+        "xgb_classes"
+    ]
+
+    comparison_metrics = pd.DataFrame(
+        comparison_bundle[
+            "cv_metrics"
+        ]
+    )
+
 except Exception as e:
-    st.sidebar.error(f"❌ Initialization Failed: {e}")
+
+    st.sidebar.error(
+        f"❌ Initialization Failed: {e}"
+    )
+
     st.stop()
 
 tactical_features = [
@@ -174,7 +213,7 @@ st.sidebar.markdown("---")
 st.sidebar.header("🧭 4. Dashboard View")
 app_mode = st.sidebar.radio(
     "Select output panel:",
-    ["🏟️ 1. Tactical Board", "⚖️ 2. Manager's A/B Matrix", "📑 3. Executive Brief"],
+    ["🏟️ 1. Tactical Board", "⚖️ 2. Manager's A/B Matrix", "📑 3. Executive Brief"， "📊 4. Model Comparison"],
     index=0
 )
 
@@ -613,3 +652,455 @@ elif app_mode == "📑 3. Executive Brief":
                     safe_str = ", ".join([f.upper() for f in managed_feats])
                     st.info(f"**✅ Secured Metrics**: \n\n`{safe_str}` \n\nThese areas remain highly stable under the current tactic. Your defensive and transition phases are fully covered.")
        
+elif app_mode == "📊 4. Model Comparison":
+    st.subheader(
+        "📊 Model Comparison Dashboard"
+    )
+
+    st.caption(
+        "Random Forest is the selected final model. "
+        "MLP and XGBoost are retained as comparison "
+        "models to demonstrate differences in validation "
+        "performance and model-estimated probabilities."
+    )
+
+
+    st.success(
+        "🏆 **Selected Final Model: Random Forest** — "
+        "selected based on competitive predictive "
+        "performance, relatively stable cross-validation "
+        "behaviour, and support for global feature "
+        "importance in the tactical prototype."
+    )
+
+
+    # =====================================================
+    # PREPARE CV METRICS
+    # =====================================================
+
+    metrics_df = comparison_metrics.copy()
+
+    # Remove DummyClassifier from the dashboard comparison
+    metrics_df = metrics_df[
+        metrics_df["Model"].isin(
+            [
+                "Random Forest",
+                "MLP",
+                "XGBoost"
+            ]
+        )
+    ].copy()
+
+    metrics_df = metrics_df.set_index(
+        "Model"
+    )
+
+
+    # =====================================================
+    # TABS
+    # =====================================================
+
+    tab1, tab2, tab3 = st.tabs(
+        [
+            "🌲 RF vs MLP",
+            "🌲 RF vs XGBoost",
+            "⚽ Same Tactical Scenario"
+        ]
+    )
+
+
+    # =====================================================
+    # TAB 1 — RF vs MLP
+    # =====================================================
+
+    with tab1:
+
+        st.markdown(
+            "### Random Forest vs MLP"
+        )
+
+        rf_mlp = metrics_df.loc[
+            [
+                "Random Forest",
+                "MLP"
+            ],
+            [
+                "Accuracy",
+                "Accuracy SD",
+                "Macro Precision",
+                "Macro Recall",
+                "Macro F1"
+            ]
+        ].copy()
+
+        st.dataframe(
+            rf_mlp.style.format(
+                "{:.4f}"
+            ),
+            use_container_width=True
+        )
+
+        st.info(
+            "**Interpretation:** Random Forest achieved "
+            "higher mean Accuracy and Macro Precision. "
+            "MLP achieved a marginally higher Macro F1, "
+            "but showed substantially greater accuracy "
+            "variation across the grouped cross-validation "
+            "folds."
+        )
+
+
+    # =====================================================
+    # TAB 2 — RF vs XGBOOST
+    # =====================================================
+
+    with tab2:
+
+        st.markdown(
+            "### Random Forest vs XGBoost"
+        )
+
+        rf_xgb = metrics_df.loc[
+            [
+                "Random Forest",
+                "XGBoost"
+            ],
+            [
+                "Accuracy",
+                "Accuracy SD",
+                "Macro Precision",
+                "Macro Recall",
+                "Macro F1"
+            ]
+        ].copy()
+
+        st.dataframe(
+            rf_xgb.style.format(
+                "{:.4f}"
+            ),
+            use_container_width=True
+        )
+
+        st.info(
+            "**Interpretation:** Random Forest and "
+            "XGBoost produced very similar overall "
+            "validation performance. Random Forest "
+            "achieved slightly higher Accuracy and "
+            "Macro Precision, while XGBoost achieved "
+            "slightly higher Macro Recall and Macro F1."
+        )
+
+
+    # =====================================================
+    # TAB 3 — SAME TACTICAL SCENARIO
+    # =====================================================
+
+    with tab3:
+
+        st.markdown(
+            "### Same Tactical Scenario — "
+            "Three-Model Prediction Comparison"
+        )
+
+        st.caption(
+            "All three models receive exactly the same "
+            "scenario-adjusted seven-feature input and "
+            "the same Monte Carlo perturbations."
+        )
+
+
+        # -------------------------------------------------
+        # Retrieve current tactical setup
+        # -------------------------------------------------
+
+        tactical_style = (
+            st.session_state.selected_philosophy
+        )
+
+        comparison_stats = apply_tactical_style(
+            mapped_stats_base,
+            tactical_style
+        )
+
+
+        # -------------------------------------------------
+        # Construct same 7-feature vector
+        # -------------------------------------------------
+
+        comparison_vector = np.array([[
+            comparison_stats["xg"],
+            comparison_stats["possession"],
+            comparison_stats["shots_on_target"],
+            comparison_stats["ppda"],
+            comparison_stats["tackles_successful"],
+            comparison_stats["interceptions"],
+            comparison_stats["aerial_duels_won_pct"]
+        ]])
+
+
+        # -------------------------------------------------
+        # Same Monte Carlo noise for ALL models
+        # -------------------------------------------------
+
+        min_bounds = np.array([
+            STAT_LIMITS[f][0]
+            for f in tactical_features
+        ])
+
+        max_bounds = np.array([
+            STAT_LIMITS[f][1]
+            for f in tactical_features
+        ])
+
+        N_COMPARE_SIM = 1000
+
+        np.random.seed(42)
+
+        comparison_noise = np.random.normal(
+            0,
+            1,
+            (N_COMPARE_SIM, 7)
+        )
+
+        comparison_scale = np.array([
+            0.15,
+            2.5,
+            0.8,
+            0.8,
+            1.2,
+            1.0,
+            2.0
+        ])
+
+        comparison_inputs = np.clip(
+            comparison_vector
+            + comparison_noise
+            * comparison_scale,
+
+            a_min=min_bounds,
+            a_max=max_bounds
+        )
+
+
+        # =================================================
+        # RANDOM FOREST
+        # =================================================
+
+        rf_probs_raw = model.predict_proba(
+            comparison_inputs
+        )
+
+        rf_classes = list(
+            model.classes_
+        )
+
+        rf_probability = {
+            outcome:
+            np.mean(
+                rf_probs_raw[
+                    :,
+                    rf_classes.index(outcome)
+                ]
+            )
+            for outcome in [
+                "Win",
+                "Draw",
+                "Loss"
+            ]
+        }
+
+
+        # =================================================
+        # MLP
+        # =================================================
+
+        mlp_probs_raw = (
+            mlp_model.predict_proba(
+                comparison_inputs
+            )
+        )
+
+        mlp_classes = list(
+            mlp_model.classes_
+        )
+
+        mlp_probability = {
+            outcome:
+            np.mean(
+                mlp_probs_raw[
+                    :,
+                    mlp_classes.index(outcome)
+                ]
+            )
+            for outcome in [
+                "Win",
+                "Draw",
+                "Loss"
+            ]
+        }
+
+
+        # =================================================
+        # XGBOOST
+        # =================================================
+
+        xgb_probs_raw = (
+            xgb_model.predict_proba(
+                comparison_inputs
+            )
+        )
+
+        xgb_probability = {
+            outcome:
+            np.mean(
+                xgb_probs_raw[
+                    :,
+                    xgb_classes.index(outcome)
+                ]
+            )
+            for outcome in [
+                "Win",
+                "Draw",
+                "Loss"
+            ]
+        }
+
+
+        # =================================================
+        # DISPLAY CURRENT SCENARIO
+        # =================================================
+
+        st.markdown(
+            f"**Current Scenario:** "
+            f"{home_team} vs {away_team} | "
+            f"{home_formation} | "
+            f"{tactical_style}"
+        )
+
+
+        # =================================================
+        # RESULT TABLE
+        # =================================================
+
+        live_comparison_df = pd.DataFrame(
+            {
+                "Random Forest": [
+                    rf_probability["Win"],
+                    rf_probability["Draw"],
+                    rf_probability["Loss"]
+                ],
+
+                "MLP": [
+                    mlp_probability["Win"],
+                    mlp_probability["Draw"],
+                    mlp_probability["Loss"]
+                ],
+
+                "XGBoost": [
+                    xgb_probability["Win"],
+                    xgb_probability["Draw"],
+                    xgb_probability["Loss"]
+                ]
+            },
+
+            index=[
+                "Win",
+                "Draw",
+                "Loss"
+            ]
+        )
+
+
+        # Convert to %
+        live_percentage_df = (
+            live_comparison_df * 100
+        )
+
+
+        st.dataframe(
+            live_percentage_df.style.format(
+                "{:.1f}%"
+            ),
+            use_container_width=True
+        )
+
+
+        # =================================================
+        # BAR CHART
+        # =================================================
+
+        st.markdown(
+            "#### Outcome Probability Comparison"
+        )
+
+        st.bar_chart(
+            live_percentage_df
+        )
+
+
+        # =================================================
+        # SIMPLE SUMMARY
+        # =================================================
+
+        rf_top = max(
+            rf_probability,
+            key=rf_probability.get
+        )
+
+        mlp_top = max(
+            mlp_probability,
+            key=mlp_probability.get
+        )
+
+        xgb_top = max(
+            xgb_probability,
+            key=xgb_probability.get
+        )
+
+
+        st.markdown(
+            "#### Model Decisions"
+        )
+
+        c1, c2, c3 = st.columns(3)
+
+        c1.metric(
+            "🌲 Random Forest",
+            rf_top,
+            f"{rf_probability[rf_top] * 100:.1f}%"
+        )
+
+        c2.metric(
+            "🧠 MLP",
+            mlp_top,
+            f"{mlp_probability[mlp_top] * 100:.1f}%"
+        )
+
+        c3.metric(
+            "🚀 XGBoost",
+            xgb_top,
+            f"{xgb_probability[xgb_top] * 100:.1f}%"
+        )
+
+
+        if (
+            rf_top
+            == mlp_top
+            == xgb_top
+        ):
+
+            st.success(
+                f"✅ All three models currently agree "
+                f"that **{rf_top}** is the most likely "
+                f"outcome under this tactical scenario."
+            )
+
+        else:
+
+            st.warning(
+                "⚠️ The three models do not fully agree "
+                "on the most likely outcome. This "
+                "demonstrates model uncertainty and shows "
+                "why comparing multiple supervised "
+                "learning approaches is useful."
+            )
