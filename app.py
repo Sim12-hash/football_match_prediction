@@ -1112,7 +1112,7 @@ elif app_mode == "📊 4. Model Comparison":
 
         c1, c2, c3 = st.columns(3)
 
-       c1.metric(
+        c1.metric(
             "🌲 Random Forest",
             f"{rf_top} — {rf_probability[rf_top] * 100:.1f}%"
         )
