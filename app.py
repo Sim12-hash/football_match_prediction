@@ -697,16 +697,16 @@ elif app_mode == "📊 4. Model Comparison":
 
 
    st.success(
-    "🏆 **Selected Final Model: Random Forest** — "
-    "Random Forest achieved the highest mean Accuracy (54.78%), "
-    "the highest Macro Precision (0.6052), and the lowest Accuracy "
-    "variation (SD = 0.0522) during development-stage grouped "
-    "cross-validation. Although MLP and XGBoost achieved marginally "
-    "higher Macro F1-Scores (0.5162 vs. 0.5155), the difference was "
-    "very small. Random Forest was retained because of its competitive "
-    "overall performance and its direct support for the global "
-    "feature-importance mechanism used by the prototype."
-)
+        "🏆 **Selected Final Model: Random Forest** — "
+        "Random Forest achieved the highest mean Accuracy (54.78%), "
+        "the highest Macro Precision (0.6052), and the lowest Accuracy "
+        "variation (SD = 0.0522) during development-stage grouped "
+        "cross-validation. Although MLP and XGBoost achieved marginally "
+        "higher Macro F1-Scores (0.5162 vs. 0.5155), the difference was "
+        "very small. Random Forest was retained because of its competitive "
+        "overall performance and its direct support for the global "
+        "feature-importance mechanism used by the prototype."
+    )
 
 
     # =====================================================
