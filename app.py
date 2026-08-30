@@ -632,7 +632,7 @@ elif app_mode == "📑 3. Executive Brief":
             press_intensity = "Highly Aggressive (High Press)" if curr_val < 11 else "Conservative (Low Block)"
             return f"Current PPDA is tracking at {curr_val:.1f} (which is {abs_diff:.1f} {direction} than baseline). Reflecting our '{style.split(' ')[0]}' approach, the defensive unit is operating in a **{press_intensity}** state. Watch out for spaces left behind the backline."
             
-       elif feat == 'possession':
+        elif feat == 'possession':
             control_type = (
             "higher relative pass control"
             if curr_val >= base_val
