@@ -656,126 +656,96 @@ elif app_mode == "📑 3. Executive Brief":
     st.caption( "This module is not a local explanation of an individual model prediction.")
 
     def get_dynamic_advice(feat, curr_val, base_val, is_advantage, style):
-    """
-    Converts scenario deviations into coach-friendly tactical summaries.
-    The statements describe scenario changes relative to the historical
-    baseline and should not be interpreted as causal explanations.
-    """
+        """
+        Converts scenario deviations into coach-friendly tactical summaries.
+        The statements describe scenario changes relative to the historical
+        baseline and should not be interpreted as causal explanations.
+        """
 
-    diff = curr_val - base_val
-    abs_diff = abs(diff)
-    direction = "higher" if diff > 0 else "lower"
+        diff = curr_val - base_val
+        abs_diff = abs(diff)
+        direction = "higher" if diff > 0 else "lower"
 
-    # -----------------------------------------------------
-    # PPDA-style pressing proxy
-    # -----------------------------------------------------
-    if feat == "ppda":
+        # PPDA-style pressing proxy
+        if feat == "ppda":
+            press_intensity = (
+                "more intensive pressing"
+                if curr_val < base_val
+                else "less intensive pressing"
+            )
+            return (
+                f"PPDA-Style Pressing Proxy is projected at {curr_val:.1f}, "
+                f"which is {abs_diff:.1f} {direction} than the historical baseline. "
+                f"Lower values represent greater defensive-action intensity, so the "
+                f"current scenario indicates **{press_intensity}**."
+            )
 
-        press_intensity = (
-            "more intensive pressing"
-            if curr_val < base_val
-            else "less intensive pressing"
-        )
+        # Pass share
+        elif feat == "possession":
+            control_type = (
+                "higher relative pass control"
+                if curr_val >= base_val
+                else "lower relative pass control"
+            )
+            return (
+                f"Projected Pass Share is {curr_val:.1f}% "
+                f"({diff:+.1f} percentage points from the historical baseline). "
+                f"This indicates **{control_type}** under the current scenario. "
+                f"Pass Share is used here as a possession-control proxy."
+            )
 
-        return (
-            f"PPDA-Style Pressing Proxy is projected at {curr_val:.1f}, "
-            f"which is {abs_diff:.1f} {direction} than the historical baseline. "
-            f"Lower values represent greater defensive-action intensity, so the "
-            f"current scenario indicates **{press_intensity}**."
-        )
+        # Expected Goals
+        elif feat == "xg":
+            status = (
+                "higher projected chance quality"
+                if curr_val >= base_val
+                else "lower projected chance quality"
+            )
+            return (
+                f"Expected Goals (xG) is projected at {curr_val:.2f} "
+                f"({diff:+.2f} from the historical baseline), indicating "
+                f"**{status}** under the current tactical scenario."
+            )
 
-    # -----------------------------------------------------
-    # Pass share
-    # -----------------------------------------------------
-    elif feat == "possession":
+        # Threatening shot count
+        elif feat == "shots_on_target":
+            status = "higher" if curr_val >= base_val else "lower"
+            return (
+                f"Threatening Shot Count is projected at {int(curr_val)}, "
+                f"which is **{status} than the historical baseline**. "
+                f"This feature counts extracted Goal, Saved and Post shot events."
+            )
 
-        control_type = (
-            "higher relative pass control"
-            if curr_val >= base_val
-            else "lower relative pass control"
-        )
+        # Defensive duel count
+        elif feat == "tackles_successful":
+            status = "higher" if curr_val >= base_val else "lower"
+            return (
+                f"Defensive Duel Count is projected at {int(curr_val)}, "
+                f"representing **{status} defensive-duel activity** relative "
+                f"to the historical baseline."
+            )
 
-        return (
-            f"Projected Pass Share is {curr_val:.1f}% "
-            f"({diff:+.1f} percentage points from the historical baseline). "
-            f"This indicates **{control_type}** under the current scenario. "
-            f"Pass Share is used here as a possession-control proxy."
-        )
+        # Interceptions
+        elif feat == "interceptions":
+            status = "higher" if curr_val >= base_val else "lower"
+            return (
+                f"Interception Count is projected at {int(curr_val)}, "
+                f"representing **{status} interception activity** relative "
+                f"to the historical baseline."
+            )
 
-    # -----------------------------------------------------
-    # Expected Goals
-    # -----------------------------------------------------
-    elif feat == "xg":
-
-        status = (
-            "higher projected chance quality"
-            if curr_val >= base_val
-            else "lower projected chance quality"
-        )
-
-        return (
-            f"Expected Goals (xG) is projected at {curr_val:.2f} "
-            f"({diff:+.2f} from the historical baseline), indicating "
-            f"**{status}** under the current tactical scenario."
-        )
-
-    # -----------------------------------------------------
-    # Threatening shot count
-    # -----------------------------------------------------
-    elif feat == "shots_on_target":
-
-        status = "higher" if curr_val >= base_val else "lower"
-
-        return (
-            f"Threatening Shot Count is projected at {int(curr_val)}, "
-            f"which is **{status} than the historical baseline**. "
-            f"This feature counts extracted Goal, Saved and Post shot events."
-        )
-
-    # -----------------------------------------------------
-    # Defensive duel count
-    # -----------------------------------------------------
-    elif feat == "tackles_successful":
-
-        status = "higher" if curr_val >= base_val else "lower"
-
-        return (
-            f"Defensive Duel Count is projected at {int(curr_val)}, "
-            f"representing **{status} defensive-duel activity** relative "
-            f"to the historical baseline."
-        )
-
-    # -----------------------------------------------------
-    # Interceptions
-    # -----------------------------------------------------
-    elif feat == "interceptions":
-
-        status = "higher" if curr_val >= base_val else "lower"
+        # 50/50 duel share
+        elif feat == "aerial_duels_won_pct":
+            return (
+                f"50/50 Duel Share is projected at {curr_val:.1f}%. "
+                f"This represents the team's relative share of recorded "
+                f"50/50 duel activity and is **not an aerial-duel win rate**."
+            )
 
         return (
-            f"Interception Count is projected at {int(curr_val)}, "
-            f"representing **{status} interception activity** relative "
-            f"to the historical baseline."
+            f"Metric value is {curr_val:.1f} "
+            f"({diff:+.1f} from the historical baseline)."
         )
-
-    # -----------------------------------------------------
-    # 50/50 duel share
-    # -----------------------------------------------------
-    elif feat == "aerial_duels_won_pct":
-
-        return (
-            f"50/50 Duel Share is projected at {curr_val:.1f}%. "
-            f"This represents the team's relative share of recorded "
-            f"50/50 duel activity and is **not an aerial-duel win rate**."
-        )
-
-    # -----------------------------------------------------
-    # Fallback
-    # -----------------------------------------------------
-    return (
-        f"Metric value is {curr_val:.1f} "
-        f"({diff:+.1f} from the historical baseline)."
-    )
 
     # Extract the feature importances from our trained Random Forest model. 
     # We need to know which statistical pillars actually dictate the outcome today.
