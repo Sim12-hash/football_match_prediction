@@ -94,6 +94,15 @@ tactical_features = [
     'ppda', 'tackles_successful', 'interceptions', 'aerial_duels_won_pct'
 ]
 
+FEATURE_LABELS = {
+    "xg": "Expected Goals (xG)",
+    "possession": "Pass Share % (Possession-Control Proxy)",
+    "shots_on_target": "Threatening Shot Count",
+    "ppda": "PPDA-Style Pressing Proxy",
+    "tackles_successful": "Defensive Duel Count",
+    "interceptions": "Interception Count",
+    "aerial_duels_won_pct": "50/50 Duel Share %"
+}
 def calculate_global_baselines(df):
     baselines = {}
     home_pass_acc = df['home_completed_passes'].sum() / df['home_attempted_pases'].sum() * 100
@@ -456,8 +465,18 @@ if app_mode == "🏟️ 1. Tactical Board":
         with st.container(border=True):
             st.success(f"**Midfield Task**: Restrict the opponent's build-up. Keep our PPDA strictly under **{adj_stats['ppda']:.1f}**.")
             st.info(f"**Defensive Task**: Maintain absolute positional discipline. We need at least **{int(adj_stats['interceptions'])}** clean interceptions.")
-            st.warning(f"**Tempo Control**: Expect to hold approximately **{adj_stats['possession']:.1f}%** possession. Offensive units must secure **{int(adj_stats['shots_on_target'])}** shots on target.")
-            st.error(f"**Physicality**: Aerial duels are non-negotiable today. Win rate must stay above **{adj_stats['aerial_duels_won_pct']:.1f}%**.")
+            st.warning(
+                f"**Tempo Control**: The current scenario projects a "
+                f"**{adj_stats['possession']:.1f}% pass share**, used here as a "
+                f"possession-control proxy. Offensive units project "
+                f"**{int(adj_stats['shots_on_target'])} threatening shots**."
+            )
+            st.error(
+                f"**Physicality**: The current scenario projects a "
+                f"**{adj_stats['aerial_duels_won_pct']:.1f}% share of recorded "
+                f"50/50 duel activity**. This represents contested-duel involvement, "
+                f"not an aerial-duel win rate."
+            )
 
 
 elif app_mode == "⚖️ 2. Manager's A/B Matrix":
