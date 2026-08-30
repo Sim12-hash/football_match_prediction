@@ -589,45 +589,45 @@ elif app_mode == "⚖️ 2. Manager's A/B Matrix":
         diff_tackles = alt_mapped_styled['tackles_successful'] - adj_stats['tackles_successful']
         
         k1.metric(
-    "🎯 Expected Goals (xG)",
-    f"{alt_mapped_styled['xg']:.2f}",
-    f"{diff_xg:+.2f}",
-    help=(
-        "Change in projected Expected Goals when switching "
-        "from Plan A to Plan B."
-    )
-)
+            "🎯 Expected Goals (xG)",
+            f"{alt_mapped_styled['xg']:.2f}",
+            f"{diff_xg:+.2f}",
+            help=(
+                "Change in projected Expected Goals when switching "
+                "from Plan A to Plan B."
+            )
+        )
 
-k2.metric(
-    "⚽ Pass Share (Control Proxy)",
-    f"{alt_mapped_styled['possession']:.1f}%",
-    f"{diff_poss:+.1f}%",
-    help=(
-        "Change in the team's projected share of total pass events. "
-        "This is used as a possession-control proxy."
-    )
-)
+        k2.metric(
+            "⚽ Pass Share (Control Proxy)",
+            f"{alt_mapped_styled['possession']:.1f}%",
+            f"{diff_poss:+.1f}%",
+            help=(
+                "Change in the team's projected share of total pass events. "
+                "This is used as a possession-control proxy."
+            )
+        )
 
-k3.metric(
-    "🏃 PPDA-Style Pressing Proxy",
-    f"{alt_mapped_styled['ppda']:.1f}",
-    f"{diff_ppda:+.1f}",
-    delta_color="inverse",
-    help=(
-        "Change in the simplified pressing proxy. "
-        "A lower value represents greater defensive-action intensity."
-    )
-)
+        k3.metric(
+            "🏃 PPDA-Style Pressing Proxy",
+            f"{alt_mapped_styled['ppda']:.1f}",
+            f"{diff_ppda:+.1f}",
+            delta_color="inverse",
+            help=(
+                "Change in the simplified pressing proxy. "
+                "A lower value represents greater defensive-action intensity."
+            )
+        )
 
-k4.metric(
-    "🛡️ Defensive Duel Count",
-    f"{alt_mapped_styled['tackles_successful']:.1f}",
-    f"{diff_tackles:+.1f}",
-    help=(
-        "Change in recorded defensive-duel activity "
-        "between Plan A and Plan B."
-    )
-)
+        k4.metric(
+            "🛡️ Defensive Duel Count",
+            f"{alt_mapped_styled['tackles_successful']:.1f}",
+            f"{diff_tackles:+.1f}",
+            help=(
+                "Change in recorded defensive-duel activity "
+                "between Plan A and Plan B."
+            )
+        )
 
 
 elif app_mode == "📑 3. Executive Brief":
