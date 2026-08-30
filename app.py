@@ -182,15 +182,36 @@ def get_team_baseline(team_df, team_name, global_base):
     if team_df.empty: return global_base.copy()
     
     total_matches = len(team_df)
-    t_xg = 0; t_poss = 0; t_sot = 0; t_tackles = 0; t_inter = 0
+    t_xg = 0
+    t_poss = 0
+    t_sot = 0
+    t_tackles = 0
+    t_inter = 0
+    t_5050_share = 0
     t_ppda_num = 0; t_ppda_den = 0
     
     for _, row in team_df.iterrows():
         if row['home_team'] == team_name:
+            duel_total = max(
+                row['home_aerials_won'] + row['away_aerials_won'],
+                1
+            )
+
+            t_5050_share += (
+                row['home_aerials_won'] / duel_total
+            ) * 100
             t_xg += row['home_xg']; t_poss += row['home_possession']; t_sot += row['home_sot']
             t_tackles += row['home_tackles']; t_inter += row['home_interceptions']
             t_ppda_num += row['away_completed_passes']; t_ppda_den += (row['home_tackles'] + row['home_interceptions'])
         else:
+            duel_total = max(
+                row['home_aerials_won'] + row['away_aerials_won'],
+                1
+            )
+
+            t_5050_share += (
+                row['home_aerials_won'] / duel_total
+            ) * 100
             t_xg += row['away_xg']; t_poss += row['away_possession']; t_sot += row['away_sot']
             t_tackles += row['away_tackles']; t_inter += row['away_interceptions']
             t_ppda_num += row['home_completed_passes']; t_ppda_den += (row['away_tackles'] + row['away_interceptions'])
@@ -201,6 +222,9 @@ def get_team_baseline(team_df, team_name, global_base):
     base['shots_on_target'] = t_sot / total_matches
     base['tackles_successful'] = t_tackles / total_matches
     base['interceptions'] = t_inter / total_matches
+    base['aerial_duels_won_pct'] = (
+        t_5050_share / total_matches
+    )
     base['ppda'] = t_ppda_num / max(t_ppda_den, 1)
     return base
 
@@ -772,7 +796,11 @@ elif app_mode == "📑 3. Executive Brief":
 
     with st.container(border=True):
         st.markdown(f"### 🏟️ Match Preview: {home_team} vs {away_team}")
-        st.caption(f"**Formation**: {home_formation} | **Style**: {tactical_style.split(' ')[0]} | **Base Win Prob**: {mc_win_pct:.1f}%")
+        st.caption(
+            f"**Formation**: {home_formation} | "
+            f"**Style**: {tactical_style.split(' ')[0]} | "
+            f"**Scenario Win Estimate**: {mc_win_pct:.1f}%"
+        )
         
         col_pos, col_neg = st.columns(2)
         
@@ -841,6 +869,13 @@ elif app_mode == "📊 4. Model Comparison":
         "chronological test set, where it achieved 58.50% Accuracy."
     )
 
+    st.caption(
+    "Supplementary stability check — Accuracy SD across the five folds: "
+    "Random Forest = 0.0522, MLP = 0.1203, XGBoost = 0.0567. "
+    "SD is shown as supporting evidence and is not one of the assignment's "
+    "required evaluation metrics."
+    )
+    
     st.caption(
         "Random Forest is the selected final model. "
         "MLP and XGBoost are retained as comparison "
@@ -1208,13 +1243,6 @@ elif app_mode == "📊 4. Model Comparison":
             use_container_width=True
         )
 
-        st.caption(
-            "Supplementary stability check — Accuracy SD across the five folds: "
-            "Random Forest = 0.0522, MLP = 0.1203, XGBoost = 0.0567. "
-            "SD is shown as supporting evidence and is not one of the assignment's "
-            "required evaluation metrics."
-        )
-        
         # =================================================
         # BAR CHART
         # =================================================
