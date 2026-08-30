@@ -632,18 +632,28 @@ elif app_mode == "📑 3. Executive Brief":
             press_intensity = "Highly Aggressive (High Press)" if curr_val < 11 else "Conservative (Low Block)"
             return f"Current PPDA is tracking at {curr_val:.1f} (which is {abs_diff:.1f} {direction} than baseline). Reflecting our '{style.split(' ')[0]}' approach, the defensive unit is operating in a **{press_intensity}** state. Watch out for spaces left behind the backline."
             
-        elif feat == 'possession':
-            control_type = "Absolute ball control" if curr_val > 50 else "Conceding possession to hit on the counter"
-            return f"Expected possession is {curr_val:.1f}% (fluctuating {diff:+.1f}% from norm). This indicates **{control_type}**. Midfielders must prioritize pass completion in the middle third."
-            
+       elif feat == 'possession':
+            control_type = (
+            "higher relative pass control"
+            if curr_val >= base_val
+            else "lower relative pass control"
+        )
+
+        return (
+            f"Projected pass share is {curr_val:.1f}% "
+            f"({diff:+.1f} percentage points from the historical baseline). "
+            f"This indicates **{control_type}** under the current scenario. "
+            f"Pass share is used here as a possession-control proxy."
+        )
         elif feat == 'xg':
             threat_level = "Lethal, capable of consistent scoring" if curr_val > 1.3 else "Sub-optimal, requiring efficient chance creation"
             return f"Expected Goals (xG) evaluated at {curr_val:.2f} (shifting {diff:+.2f} from historical average). Offensive threat is currently **{threat_level}**. Conversion in the final third will dictate the outcome."
             
         elif feat == 'shots_on_target':
-            status = "plentiful" if curr_val >= base_val else "lacking"
-            return f"Projected shots on target: {int(curr_val)}. Offensive output is **{status}**. Attackers are instructed to increase shots from outside the box and hunt for rebounds."
-            
+            status = "higher" if curr_val >= base_val else "lower"
+
+            return ( f"Threatening Shot Count is projected at {int(curr_val)}, " f"which is **{status} than the historical baseline**. " f"This feature counts extracted Goal, Saved and Post shot events." )
+
         elif feat == 'tackles_successful':
             status = "sufficient" if curr_val >= base_val else "vulnerable"
             return f"Successful tackles estimated at {int(curr_val)}. Midfield grit and defensive solidity is **{status}**. Crucial for disrupting the opponent's primary playmakers."
@@ -653,8 +663,7 @@ elif app_mode == "📑 3. Executive Brief":
             return f"Interceptions projected at {int(curr_val)}. Defensive anticipation is **{status}**. The backline must actively cut off passing lanes and through-balls."
             
         elif feat == 'aerial_duels_won_pct':
-            air_status = "Dominant in the air" if curr_val >= 50 else "Struggling with aerial battles"
-            return f"Aerial win rate anticipated at {curr_val:.1f}%. Assessment: **{air_status}**. This directly impacts our vulnerability to set-pieces and wide crosses."
+            return (f"50/50 Duel Share is projected at {curr_val:.1f}%. "f"This represents the team's relative share of recorded " f"50/50 duel activity and is **not an aerial-duel win rate**.")
             
         return f"Metric value is {curr_val:.1f} (deviation {diff:+.1f} from norm). Requires specific in-game monitoring."
 
@@ -707,7 +716,8 @@ elif app_mode == "📑 3. Executive Brief":
                 for feat, val, score in top_negatives:
                     base_val = team_baseline[feat] 
                     advice = get_dynamic_advice(feat, val, base_val, False, tactical_style)
-                    st.error(f"**{feat.upper()}** (Value: `{val:.1f}`)\n\n*Warning: {advice}*")
+                    display_feat = FEATURE_LABELS.get(feat, feat)
+                    st.error(f"**{display_feat}** (Value: `{val:.1f}`)\n\n"f"*Warning: {advice}*")
             else:
                 # 🚀 Advanced Empty State Design: 
                 # What if the manager crafts a flawless tactic with no statistical weaknesses?
@@ -720,21 +730,16 @@ elif app_mode == "📑 3. Executive Brief":
                 managed_feats = [c[0] for c in contributions if c[2] >= 0 and c not in top_positives]
                 
                 if managed_feats:
-                    safe_str = ", ".join([f.upper() for f in managed_feats])
+                    safe_str = ", ".join(
+                        FEATURE_LABELS.get(f, f)
+                        for f in managed_feats
+                    )
                     st.info(f"**✅ Secured Metrics**: \n\n`{safe_str}` \n\nThese areas remain highly stable under the current tactic. Your defensive and transition phases are fully covered.")
        
 elif app_mode == "📊 4. Model Comparison":
     st.subheader(
         "📊 Model Comparison Dashboard"
     )
-
-    st.caption(
-        "Random Forest is the selected final model. "
-        "MLP and XGBoost are retained as comparison "
-        "models to demonstrate differences in validation "
-        "performance and model-estimated probabilities."
-    )
-    
 
     st.success(
         "🏆 **Selected Final Model: Random Forest** — "
@@ -756,6 +761,12 @@ elif app_mode == "📊 4. Model Comparison":
         "chronological test set, where it achieved 58.50% Accuracy."
     )
 
+    st.caption(
+        "Random Forest is the selected final model. "
+        "MLP and XGBoost are retained as comparison "
+        "models to demonstrate differences in validation "
+        "performance and model-estimated probabilities."
+    )
     # =====================================================
     # PREPARE CV METRICS
     # =====================================================
