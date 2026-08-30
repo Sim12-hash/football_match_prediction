@@ -676,7 +676,11 @@ elif app_mode == "📑 3. Executive Brief":
                 for feat, val, score in top_positives:
                     base_val = team_baseline[feat] 
                     advice = get_dynamic_advice(feat, val, base_val, True, tactical_style)
-                    st.success(f"**{feat.upper()}** (Value: `{val:.1f}`)\n\n*Analysis: {advice}*")
+                    display_feat = FEATURE_LABELS.get(feat, feat)
+                    st.success(
+                    f"**{display_feat}** (Value: `{val:.1f}`)\n\n"
+                    f"*Analysis: {advice}*"
+                )
             else:
                 st.caption("No distinct statistical advantages found.")
 
@@ -713,7 +717,7 @@ elif app_mode == "📊 4. Model Comparison":
         "models to demonstrate differences in validation "
         "performance and model-estimated probabilities."
     )
-
+    
 
     st.success(
         "🏆 **Selected Final Model: Random Forest** — "
@@ -727,6 +731,13 @@ elif app_mode == "📊 4. Model Comparison":
         "feature-importance mechanism used by the prototype."
     )
 
+    st.info(
+        "📌 **Evaluation stages:** 54.78% is Random Forest's mean Accuracy "
+        "during development-stage Stratified Group 5-Fold Cross-Validation "
+        "on the 2018–2020 data. After model selection was completed, "
+        "Random Forest was evaluated once on the later 2022–2024 "
+        "chronological test set, where it achieved 58.50% Accuracy."
+    )
 
     # =====================================================
     # PREPARE CV METRICS
@@ -780,7 +791,6 @@ elif app_mode == "📊 4. Model Comparison":
             ],
             [
                 "Accuracy",
-                "Accuracy SD",
                 "Macro Precision",
                 "Macro Recall",
                 "Macro F1"
@@ -821,7 +831,6 @@ elif app_mode == "📊 4. Model Comparison":
             ],
             [
                 "Accuracy",
-                "Accuracy SD",
                 "Macro Precision",
                 "Macro Recall",
                 "Macro F1"
@@ -1091,7 +1100,13 @@ elif app_mode == "📊 4. Model Comparison":
             use_container_width=True
         )
 
-
+        st.caption(
+            "Supplementary stability check — Accuracy SD across the five folds: "
+            "Random Forest = 0.0522, MLP = 0.1203, XGBoost = 0.0567. "
+            "SD is shown as supporting evidence and is not one of the assignment's "
+            "required evaluation metrics."
+        )
+        
         # =================================================
         # BAR CHART
         # =================================================
@@ -1147,22 +1162,20 @@ elif app_mode == "📊 4. Model Comparison":
         )
 
 
-        if (
-            rf_top
-            == mlp_top
-            == xgb_top
-        ):
-
+        if rf_top == mlp_top == xgb_top:
             st.success(
-                f"✅ All three models currently agree "
-                f"that **{rf_top}** is the most likely "
-                f"outcome under this tactical scenario."
+                f"✅ All three models currently agree that **{rf_top}** "
+                "is the most likely outcome under this tactical scenario."
             )
-
         else:
-
             st.warning(
-                "ℹ️ The displayed Win, Draw and Loss percentages are "
-                "**model-estimated probabilities**, not calibrated probabilities. "
-                "No separate probability-calibration method was applied."
+                "⚠️ The three models do not fully agree on the most likely "
+                "outcome. This illustrates model disagreement under the same "
+                "tactical scenario."
             )
+
+        st.info(
+            "ℹ️ The displayed Win, Draw and Loss percentages are "
+            "**model-estimated probabilities**, not calibrated probabilities. "
+            "No separate probability-calibration procedure was applied."
+        )
