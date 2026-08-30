@@ -431,40 +431,57 @@ if app_mode == "🏟️ 1. Tactical Board":
         st.pyplot(fig_pitch)
 
         st.markdown("##### 📈 Projected Match KPIs vs. Historical Baseline")
-        st.caption("The colored delta values show the **net tactical gain/loss** compared to your team's usual historical average. Coach, use this to see if your tactic is actually improving the team or hurting it.")
-        k1, k2, k3, k4 = st.columns(4)
-        
-        k1.metric(
-            label="🎯 xG (Scoring Threat)", 
-            value=f"{adj_stats['xg']:.2f}", 
-            delta=f"{adj_stats['xg'] - team_baseline['xg']:+.2f}",
-            help="Expected Goals. Higher value = Creating better, more lethal scoring chances."
+
+    st.caption(
+        "The delta values show how the current tactical scenario changes "
+        "each projected indicator relative to the team's historical baseline."
+    )
+
+    k1, k2, k3, k4 = st.columns(4)
+
+    k1.metric(
+        label="🎯 Expected Goals (xG)",
+        value=f"{adj_stats['xg']:.2f}",
+        delta=f"{adj_stats['xg'] - team_baseline['xg']:+.2f}",
+        help="Expected scoring opportunity quality. Higher values indicate greater projected chance quality."
+    )
+
+    k2.metric(
+        label="⚽ Pass Share (Control Proxy)",
+        value=f"{adj_stats['possession']:.1f}%",
+        delta=f"{adj_stats['possession'] - team_baseline['possession']:+.1f}%",
+        help=(
+            "The team's share of total pass events. "
+            "It is used as a possession-control proxy rather than official possession time."
         )
-        k2.metric(
-            label="⚽ Possession (Game Control)", 
-            value=f"{adj_stats['possession']:.1f}%", 
-            delta=f"{adj_stats['possession'] - team_baseline['possession']:+.1f}%",
-            help="Ball control percentage. Higher value = Dominating the game tempo and dictating play."
+    )
+
+    k3.metric(
+        label="🏃 PPDA-Style Pressing Proxy",
+        value=f"{adj_stats['ppda']:.1f}",
+        delta=f"{adj_stats['ppda'] - team_baseline['ppda']:+.1f}",
+        delta_color="inverse",
+        help=(
+            "Opponent completed passes divided by recorded Duel and Interception events. "
+            "Lower values indicate greater defensive-action intensity."
         )
-        k3.metric(
-            label="🏃 PPDA (Pressing Intensity)", 
-            value=f"{adj_stats['ppda']:.1f}", 
-            delta=f"{adj_stats['ppda'] - team_baseline['ppda']:+.1f}", 
-            delta_color="inverse",
-            help="Passes Allowed Per Defensive Action. LOWER value = Fiercer, more aggressive high press."
+    )
+
+    k4.metric(
+        label="🛡️ Defensive Duel Count",
+        value=f"{adj_stats['tackles_successful']:.1f}",
+        delta=f"{adj_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}",
+        help=(
+            "Recorded Duel events used as a proxy for defensive duel activity. "
+            "This is not strictly a successful-tackle count."
         )
-        k4.metric(
-            label="🛡️ Tackles (Defensive Solidity)", 
-            value=f"{adj_stats['tackles_successful']:.1f}", 
-            delta=f"{adj_stats['tackles_successful'] - team_baseline['tackles_successful']:+.1f}",
-            help="Successful tackles won. Higher value = Stronger physical dominance in midfield/defense."
-        )
+    )
 
     with col_panel:
         st.markdown("#### 🎯 Player Execution KPIs (Locker Room Directives)")
         with st.container(border=True):
-            st.success(f"**Midfield Task**: Restrict the opponent's build-up. Keep our PPDA strictly under **{adj_stats['ppda']:.1f}**.")
-            st.info(f"**Defensive Task**: Maintain absolute positional discipline. We need at least **{int(adj_stats['interceptions'])}** clean interceptions.")
+            st.success( f"**Midfield Task**: The current scenario projects a " f"**PPDA-style pressing proxy of {adj_stats['ppda']:.1f}**. " f"Lower values represent more intensive pressing.")
+            st.info( f"**Defensive Task**: The current scenario projects approximately " f"**{int(adj_stats['interceptions'])} interception events**.")
             st.warning(
                 f"**Tempo Control**: The current scenario projects a "
                 f"**{adj_stats['possession']:.1f}% pass share**, used here as a "
