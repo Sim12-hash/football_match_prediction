@@ -238,12 +238,9 @@ home_formation = st.sidebar.selectbox("Our Formation", formation_list, index=0)
 opp_formation = st.sidebar.selectbox("Opponent Formation", formation_list, index=1)
 
 st.sidebar.markdown("---")
-st.sidebar.header("🎯 3. Match Scenarios")
-scenario = st.sidebar.radio("Current Game State", ["Balanced Start (0-0)", "Trailing - Press All Out", "Leading - Park the Bus"], index=0)
-
 # ✨ THE UX FIX: Navigation dynamically rests at the bottom as the final action step
 st.sidebar.markdown("---")
-st.sidebar.header("🧭 4. Dashboard View")
+st.sidebar.header("🧭 3. Dashboard View")
 app_mode = st.sidebar.radio(
     "Select output panel:",
     ["🏟️ 1. Tactical Board", "⚖️ 2. Manager's A/B Matrix", "📑 3. Executive Brief", "📊 4. Model Comparison"],
@@ -262,6 +259,8 @@ def load_feature_reference():
 
 feature_reference = load_feature_reference()
 
+GLOBAL_COV_MATRIX = feature_reference[tactical_features].cov().values
+
 STAT_LIMITS = {
     feat: (
         float(feature_reference[feat].min()),
@@ -278,7 +277,7 @@ def enforce_realistic_bounds(stats_dict):
             bounded[feat] = max(min_val, min(max_val, bounded[feat]))
     return bounded
 
-def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
+def apply_formation_clash_engine(home_base, opp_base, h_form, a_form ):
     mapped = home_base.copy()
     
     xg_diff_factor = (home_base['xg'] - opp_base['xg']) * 0.1
@@ -305,11 +304,6 @@ def apply_formation_clash_engine(home_base, opp_base, h_form, a_form, scenario):
         mapped['possession'] += 6.0
     elif a_form in ["3-5-2", "4-2-3-1"]:
         mapped['tackles_successful'] += 2.0
-
-    if scenario == "Trailing - Press All Out":
-        mapped['ppda'] = 5.5; mapped['tackles_successful'] += 5.0; mapped['xg'] *= 1.2; mapped['shots_on_target'] *= 1.2
-    elif scenario == "Leading - Park the Bus":
-        mapped['possession'] = 33.0; mapped['ppda'] = 20.0; mapped['xg'] *= 0.6; mapped['shots_on_target'] *= 0.6
 
     # Return the bounded results
     return enforce_realistic_bounds(mapped)
@@ -341,7 +335,7 @@ def apply_tactical_style(stats_dict, style):
     return enforce_realistic_bounds(adj)
 
 # Calculate base collision stats
-mapped_stats_base = apply_formation_clash_engine(team_baseline, opp_baseline, home_formation, opp_formation, scenario)
+mapped_stats_base = apply_formation_clash_engine(team_baseline, opp_baseline, home_formation, opp_formation )
 
 # Fetch available philosophies based on the chosen formation
 available_philosophies = FORMATION_PHILOSOPHIES.get(home_formation, ["Standard (Balanced setup)"])
@@ -587,7 +581,7 @@ elif app_mode == "⚖️ 2. Manager's A/B Matrix":
             )
 
         alt_default_style = FORMATION_PHILOSOPHIES.get(alt_formation, ["Standard"])[0]
-        alt_mapped_base = apply_formation_clash_engine(team_baseline, opp_baseline, alt_formation, opp_formation, scenario)
+        alt_mapped_base = apply_formation_clash_engine(team_baseline, opp_baseline, alt_formation, opp_formation )
         alt_mapped_styled = apply_tactical_style(alt_mapped_base, alt_default_style)
         
         alt_vector = np.array([[alt_mapped_styled[f] for f in tactical_features]])
@@ -1022,7 +1016,7 @@ elif app_mode == "📊 4. Model Comparison":
             st.markdown(
                 """
                 - **Formation is not a direct machine-learning feature.**
-                - The selected formation, opponent formation, match scenario and
+                - The selected formation, opponent formation and
                   tactical philosophy first modify the team's historical baseline
                   through predefined scenario rules.
                 - This produces the same seven numerical inputs for all three models.
