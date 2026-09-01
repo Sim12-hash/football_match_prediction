@@ -237,7 +237,6 @@ formation_list = list(TACTICAL_CONFIG.keys())
 home_formation = st.sidebar.selectbox("Our Formation", formation_list, index=0)
 opp_formation = st.sidebar.selectbox("Opponent Formation", formation_list, index=1)
 
-st.sidebar.markdown("---")
 # ✨ THE UX FIX: Navigation dynamically rests at the bottom as the final action step
 st.sidebar.markdown("---")
 st.sidebar.header("🧭 3. Dashboard View")
