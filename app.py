@@ -258,8 +258,6 @@ def load_feature_reference():
 
 feature_reference = load_feature_reference()
 
-GLOBAL_COV_MATRIX = feature_reference[tactical_features].cov().values
-
 STAT_LIMITS = {
     feat: (
         float(feature_reference[feat].min()),
